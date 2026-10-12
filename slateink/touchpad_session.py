@@ -1,0 +1,107 @@
+"""Two-hand roles, precision, pause and deliberate Wispr gesture coordination."""
+from .hand_gestures import open_palm,victory,DwellPose
+from .touchpad_submodes import GamingController,DrawingController
+
+
+class TouchpadSession:
+    def __init__(self,controller,shortcuts,movement_keys=None):
+        self.controller=controller;self.shortcuts=shortcuts
+        self.config=controller.config;self.paused=False;self.chosen_label=None
+        self.pause_pose=DwellPose(hold=.9);self.voice_pose=DwellPose(hold=.7)
+        self.voice_started=None;self.voice_end_since=None;self.primary=None;self.helper=None
+        self.gaming=GamingController(self.config,movement_keys)
+        self.drawing=DrawingController(self.config,controller.sink,movement_keys.target if movement_keys else None)
+
+    @property
+    def button_held(self):return "left" if self.config.touchpad_submode=="drawing" and (self.drawing.held or self.drawing.click_held) else self.controller.button_held
+
+    def release_inputs(self):
+        try:self.gaming.interrupt()
+        finally:
+            try:self.drawing.interrupt()
+            finally:self.controller.interrupt()
+
+    @property
+    def dictating(self):return self.voice_started is not None
+
+    def interrupt(self):
+        try:
+            if self.shortcuts:self.shortcuts.cancel()
+        finally:
+            try:self.release_inputs()
+            finally:
+                self.voice_started=None;self.voice_end_since=None
+                self.voice_pose.reset();self.pause_pose.reset();self.primary=None;self.helper=None
+
+    def set_enabled(self,value):
+        self.controller.enabled=False;self.interrupt();self.controller.set_enabled(value)
+        self.paused=False;self.chosen_label=None
+
+    def toggle_pause(self):
+        self.interrupt();self.paused=not self.paused
+        if self.config.touchpad_submode=="gaming":return "Gaming paused — Ctrl+Alt+M resumes." if self.paused else "Gaming resumed — hold your left palm still to center."
+        return "Hand touchpad paused — show both open palms or press Ctrl+Alt+M to resume." if self.paused else "Hand touchpad resumed — open pinches, then join index + middle."
+
+    def choose_hands(self,hands):
+        if len(hands)>2 or len({h.label for h in hands})!=len(hands):return None,None
+        if self.config.touchpad_submode=="gaming" or (self.config.touchpad_submode=="drawing" and self.config.drawing_two_hand):
+            # This installed Tasks model labels the unmirrored public left-hand
+            # fixture Left and its mirror Right. Do not apply the legacy Hands
+            # selfie convention: the live frames have already been mirrored.
+            right="Left" if self.config.camera_mirrored else "Right"
+            return next((h for h in hands if h.label==right),None),next((h for h in hands if h.label!=right),None)
+        wanted=self.config.touchpad_hand
+        if wanted=="auto":
+            if self.chosen_label is None and hands:self.chosen_label=hands[0].label
+            wanted=self.chosen_label
+        primary=next((h for h in hands if h.label==wanted),None)
+        helper=next((h for h in hands if h.label!=wanted),None)
+        return primary,helper
+
+    def process(self,hands,t,age=0,aspect=4/3):
+        if not self.controller.enabled:return "Touchpad off."
+        if age>.2:
+            self.interrupt();return "Camera tracking stale — input released and dictation cancelled."
+        if len(hands)>2 or len({h.label for h in hands})!=len(hands):
+            self.interrupt();return "Hand roles unclear — input released. Separate your hands."
+        self.primary,self.helper=self.choose_hands(hands)
+        # Left joystick already uses a palm. A relaxed right mouse hand can
+        # also have all four fingers extended; that must not pause gameplay.
+        both_open=self.config.touchpad_submode!="gaming" and open_palm(self.primary,aspect) and open_palm(self.helper,aspect)
+        if self.pause_pose.update(both_open,t):return self.toggle_pause()
+        if both_open:
+            self.release_inputs();return "Hold both open palms steadily to pause/resume."
+        if self.paused:return "PAUSED — press Ctrl+Alt+M to resume." if self.config.touchpad_submode=="gaming" else "PAUSED — hold both open palms for one second, or press Ctrl+Alt+M."
+        if self.config.touchpad_submode=="gaming":
+            self.gaming.config=self.config
+            if self.primary is None:
+                self.interrupt();return "Right mouse hand missing — all inputs released. Show both hands to play."
+            target=self.gaming.sink.target() if self.gaming.sink else None
+            if target is None or (self.gaming.target is not None and target!=self.gaming.target):
+                self.interrupt();return "Focus changed — mouse and WASD released. Focus the game, then hold your left palm still to center."
+            keys=self.gaming.process(self.helper,t,age,aspect)
+            mouse=self.controller.process(self.primary,t,age,aspect)
+            return keys+"  Right mouse: "+mouse
+        if self.config.touchpad_submode=="drawing":
+            self.drawing.config=self.config;self.drawing.sink=self.controller.sink
+            return self.drawing.process(self.primary,t,age,aspect,click_hand=self.helper,split_click=self.config.drawing_two_hand)
+        pose=victory(self.helper,aspect) or victory(self.primary,aspect)
+        if not self.config.wispr_enabled:pose=False
+        requested=self.voice_pose.update(pose,t)
+        if requested and not self.dictating and self.shortcuts:
+            self.controller.interrupt()
+            self.shortcuts.begin(self.config.wispr_shortcut_mode)
+            self.voice_started=t;self.voice_end_since=None
+        if self.dictating:
+            self.controller.interrupt() # Keep the selected textbox/cursor stable.
+            if not self.shortcuts.target_unchanged():
+                self.interrupt();return "Dictation cancelled because the focused textbox/window changed."
+            if pose:self.voice_end_since=None
+            elif self.voice_end_since is None:self.voice_end_since=t
+            if self.voice_end_since is not None and t-self.voice_end_since>=.45 and t-self.voice_started>=1:
+                self.shortcuts.finish();self.voice_started=None;self.voice_end_since=None
+                return "Wispr stop shortcut sent — wait for Flow to insert text; open pinches to resume pointing."
+            return "Wispr gesture active — speak after Flow's ping; lower the V gesture to finish."
+        if pose:
+            self.controller.interrupt();return "Hold the V gesture steadily to start Wispr."
+        return self.controller.process(self.primary,t,age,aspect,precision=open_palm(self.helper,aspect))

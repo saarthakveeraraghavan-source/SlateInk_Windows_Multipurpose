@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SlateInk gesture guide</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;color:#172536;background:#eef2f7;margin:0}main{max-width:880px;margin:32px auto;padding:28px;background:white;border-radius:12px}h1,h2{line-height:1.25}table{border-collapse:collapse;width:100%;margin:18px 0}td,th{text-align:left;border-bottom:1px solid #dce4ed;padding:10px}th{background:#e8f4f1}aside{padding:14px;background:#e8f4f1;border-radius:8px}a{color:#087f71}nav a{margin-right:20px}@media(max-width:600px){main{margin:0;padding:20px}}</style>
+<main><h1>SlateInk hand touchpad</h1>
+<p>Choose a touchpad sub-mode before enabling controls. Camera and desktop input start off. Focus the destination app during the three-second countdown.</p>
+<nav><a href="#desktop">Desktop</a><a href="#gaming">Gaming</a><a href="#drawing">Drawing tablet</a><a href="#stop">Pause and stop</a></nav>
+<h2 id="desktop">Desktop</h2>
+<p>Choose the control hand, or show your preferred hand first with “first shown.” Open both pinches briefly to arm.</p>
+<table><tr><th>Gesture</th><th>Action</th></tr>
+<tr><td>Index + middle straight and joined</td><td>Move the cursor; separate them to reposition your hand.</td></tr>
+<tr><td>Thumb + index pinch and release</td><td>Left click; twice for double click. Keep another finger extended.</td></tr>
+<tr><td>Hold thumb + index, then deliberately move your hand</td><td>Drag or select; release to finish.</td></tr>
+<tr><td>Thumb + middle pinch and release</td><td>Right click; keep another finger extended.</td></tr>
+<tr><td>Index + middle + ring extended, little curled</td><td>Scroll up/down; move sideways first for horizontal scrolling.</td></tr>
+<tr><td>Helper hand open palm</td><td>Slower precision pointing.</td></tr>
+<tr><td>Steady V sign for about 0.7 seconds</td><td>Start Wispr if enabled; lower the V to finish. Wait for Wispr’s own ping before speaking.</td></tr></table>
+<p>Wispr must already be running with the configured shortcut. The saved setting is Ctrl+Win: press to start/stop. SlateInk does not read or save its transcript. Wispr gestures are active only in Desktop.</p>
+<h2 id="gaming">Gaming</h2>
+<p>Choose <strong>Touchpad: gaming</strong>. Your physical right hand uses the existing mouse gestures. Your left hand steers. Keep both visible; mirroring on is recommended.</p>
+<p>Hold the left palm still for about 0.3 seconds with at least three fingers extended to set a comfortable center. No initial fist is needed. Move that palm as a small joystick:</p>
+<table><tr><th>Left hand</th><th>Movement</th></tr>
+<tr><td>Forward / left / back / right from center</td><td>W / A / S / D held</td></tr>
+<tr><td>Diagonal</td><td>Two keys, such as W + A</td></tr>
+<tr><td>Return to center</td><td>Stop movement</td></tr>
+<tr><td>Close fist</td><td>Stop immediately; reopen to set a new center</td></tr></table>
+<p><strong>Joystick travel × palm:</strong> lower needs less movement; higher gives more neutral room. Hand loss releases the corresponding input; missing right hand or window changes release all input. Hold a steady palm to recenter after interruption. The optional status display shows keys and centering/tracking messages over other apps without taking focus. <strong>Ctrl+Alt+M pauses gaming</strong>; the two-palm pause gesture is inactive here. The complete joystick path passed actual Blender 5.2.1 Walk Navigation with synthetic hand observations; physical recognition still needs your trial.</p>
+<h2 id="drawing">Drawing tablet</h2>
+<p>Choose <strong>Touchpad: drawing tablet</strong>. Enable drawing controls, then focus Paint, Xournal++ or another drawing app. Hover to a brush or pen and use thumb–index pinch to click it.</p>
+<table><tr><th>Control hand</th><th>Effect</th></tr>
+<tr><td>Index + middle extended; ring/little curled</td><td>Hover without ink. Hold briefly to arm.</td></tr>
+<tr><td>Index only extended</td><td>Draw with the moving index tip. No pinch needed.</td></tr>
+<tr><td>Thumb + index pinch and release; middle stays extended</td><td>Click a tool at the current hover target. Cursor freezes through the pinch; return to index + middle hover before drawing again.</td></tr>
+<tr><td>Raise middle again</td><td>Lift the pen and hover.</td></tr>
+<tr><td>Fold the fingers / relax</td><td>Lift and reposition without moving the cursor.</td></tr></table>
+<p><strong>Drawing speed ×:</strong> a separate constant scale for drawing. Equal camera-pixel travel gives equal screen-pixel travel in every direction, after smoothing. No drawing acceleration, scroll, right pinch click or Wispr gesture. After lost tracking or a window change, show index + middle to re-arm.</p>
+<aside>Try a cross, circle, square and disconnected short strokes. Comfort and physical precision need your trial. Webcam drawing has no pressure or tilt sensor.</aside>
+<p><strong>Left hand clicks / right hand draws</strong> is optional and off by default. When enabled before activation, right index + middle hovers and right index alone draws. Left thumb/index pinch clicks tools; keep another left finger extended and open the pinch briefly to arm. Clicks lift ink and freeze the cursor until release. Only the right fingertip supplies drawing coordinates, smoothing and scale.</p>
+<h2 id="stop">Pause, background and stop</h2>
+<p><strong>Two open palms held about one second</strong>: pause/resume Desktop and Drawing. <strong>Ctrl+Alt+M</strong>: pause/resume every touchpad sub-mode, including Gaming. Lower the palms before repeating. <strong>Escape</strong> or <strong>Stop everything</strong>: stop the camera and release app-owned keys/buttons.</p>
+<p>Keep running when minimized works only for an enabled hand touchpad with its tray indicator. Use the tray menu to show SlateInk, pause, stop or quit. Disable controls before changing settings; preferences save locally. Focus changes lift drawing ink and release gaming input.</p>
+<p>Use front lighting and keep control fingertips and knuckles in view. Tracking and frames stay local. Native input cannot bypass Windows privilege protection.</p>
+</main></html>
