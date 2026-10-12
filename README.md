@@ -22,6 +22,8 @@ for Desktop, Gaming, Drawing, background use, scrolling, shortcuts and pause/sto
 
 ## Install and run on Windows
 
+**Installing on another computer?** Follow the [step-by-step Windows setup guide](docs/SETUP_ANOTHER_WINDOWS_PC.md), including camera, CPU/GPU, mode, Wispr and calibration settings.
+
 Use Python **3.12 x64**, Windows 11, and a compatible webcam. Dependencies are pinned.
 An NVIDIA GPU is optional for paper OCR; CPU operation is available.
 The model setup scripts download public model assets and verify their hashes.
