@@ -16,3 +16,11 @@ evaluation-results.csv
 !.env.example
 *.pem
 *.key
+
+
+# Original personal reference recordings are not repository source.
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm

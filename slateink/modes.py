@@ -15,6 +15,7 @@ from .gaze_widgets import GazeCalibrationDialog
 from .touchpad_session import TouchpadSession
 from .desktop_shortcuts import WindowsWisprShortcut
 from .touchpad_submodes import WindowsMovementKeys
+from .window_switching import WindowsWindowSwitcher
 
 MODES=("paper","hand_mouse","pen_pointer","finger_letters","eye_gaze")
 
@@ -33,7 +34,7 @@ class ModesMixin:
         self.shortcut_sink=None;self.touchpad_session=None;self.desktop_hotkey=None;self.tray=None;self.arm_touchpad_when_ready=False
         self.game_hud=None
         if self.hand_mouse:
-            self.shortcut_sink=WindowsWisprShortcut();self.touchpad_session=TouchpadSession(self.hand_mouse,self.shortcut_sink,WindowsMovementKeys())
+            self.shortcut_sink=WindowsWisprShortcut();self.touchpad_session=TouchpadSession(self.hand_mouse,self.shortcut_sink,WindowsMovementKeys(),WindowsWindowSwitcher())
         self.gaze_calibration=GazeCalibration();self.gaze_dialog=None
         self.gaze_controller=GazeController(self.config,self.mouse_sink,self.gaze_calibration) if self.mouse_sink else None
         if self.mode=="paper":self.config=replace(self.config,camera_width=1280,camera_height=720)
@@ -75,6 +76,13 @@ class ModesMixin:
         self.gaming_display=QCheckBox("Show WASD status over other apps");self.gaming_display.setChecked(self.config.gaming_hud);sub.addWidget(self.gaming_display)
         self.drawing_helper=QCheckBox("Left hand clicks / right hand draws");self.drawing_helper.setChecked(self.config.drawing_two_hand);sub.addWidget(self.drawing_helper)
         sub.addStretch();layout.addWidget(self.submode_panel)
+        self.swipe_panel=QWidget();swipes=QHBoxLayout(self.swipe_panel);swipes.setContentsMargins(0,0,0,0)
+        self.swipe_enabled=QCheckBox("Enable window swipes");self.swipe_enabled.setChecked(self.config.touchpad_swipe_enabled);swipes.addWidget(self.swipe_enabled)
+        self.swipe_enabled.setToolTip("Uncheck to disable next/previous air swipes. You can change this while using the mouse; your choice is saved.")
+        self.swipe_sensitivity=QDoubleSpinBox();self.swipe_sensitivity.setRange(.5,2);self.swipe_sensitivity.setSingleStep(.1);self.swipe_sensitivity.setValue(self.config.touchpad_swipe_sensitivity);self.swipe_sensitivity.setPrefix("Swipe sensitivity × ");swipes.addWidget(self.swipe_sensitivity)
+        self.swipe_sensitivity.setToolTip("Higher sensitivity needs less sideways hand travel. Use the relaxed-hand strokes in your latest Next and Previous videos; no open palm is required.")
+        self.swipe_cooldown=QDoubleSpinBox();self.swipe_cooldown.setRange(.4,3);self.swipe_cooldown.setSingleStep(.1);self.swipe_cooldown.setValue(self.config.touchpad_swipe_cooldown);self.swipe_cooldown.setPrefix("Swipe cooldown ");self.swipe_cooldown.setSuffix(" s");swipes.addWidget(self.swipe_cooldown)
+        swipes.addStretch();layout.addWidget(self.swipe_panel)
         self.wispr_panel=QWidget();flow=QHBoxLayout(self.wispr_panel);flow.setContentsMargins(0,0,0,0)
         self.wispr_enabled=QCheckBox("V gesture → Wispr Flow");self.wispr_enabled.setChecked(self.config.wispr_enabled);flow.addWidget(self.wispr_enabled)
         self.wispr_mode=QComboBox();self.wispr_mode.addItems(["Ctrl+Win: press to start/stop","Ctrl+Win: hold to talk","Ctrl+Win+Space: start/stop"])
@@ -82,6 +90,8 @@ class ModesMixin:
         self.guide_button=self.button("Open gesture guide",self.open_touchpad_guide);flow.addWidget(self.guide_button);flow.addStretch();layout.addWidget(self.wispr_panel)
         for signal in (self.hand_choice.currentIndexChanged,self.scroll_speed.valueChanged,self.natural_scroll.toggled,self.background_touchpad.toggled,self.wispr_enabled.toggled,self.wispr_mode.currentIndexChanged):signal.connect(self.update_touchpad_options)
         for signal in (self.submode_choice.currentIndexChanged,self.drawing_speed.valueChanged,self.gaming_radius.valueChanged,self.gaming_display.toggled,self.drawing_helper.toggled):signal.connect(self.update_touchpad_options)
+        self.swipe_enabled.toggled.connect(self.set_window_swipes)
+        for signal in (self.swipe_sensitivity.valueChanged,self.swipe_cooldown.valueChanged):signal.connect(self.update_touchpad_options)
         self.mode_choice.currentIndexChanged.connect(self.change_mode)
         self.mode_note=QLabel(); self.mode_note.setWordWrap(True); self.mode_note.setObjectName("hint")
         layout.addWidget(self.mode_note)
@@ -92,10 +102,20 @@ class ModesMixin:
         if self.touchpad_session:self.touchpad_session.config=self.config
         self.save_touchpad_preferences()
 
+    def set_window_swipes(self,enabled):
+        self.config=replace(self.config,touchpad_swipe_enabled=enabled)
+        if self.hand_mouse:self.hand_mouse.config=self.config
+        if self.touchpad_session:
+            self.touchpad_session.config=self.config
+            self.touchpad_session.swipe.reset()
+        self.save_touchpad_preferences()
+        self.refresh_controls()
+
     def update_touchpad_options(self,*args):
         self.stop_pointer()
         self.config=replace(self.config,touchpad_hand=("auto","Left","Right")[self.hand_choice.currentIndex()],touchpad_scroll_speed=self.scroll_speed.value(),touchpad_natural_scroll=self.natural_scroll.isChecked(),touchpad_background=self.background_touchpad.isChecked(),wispr_enabled=self.wispr_enabled.isChecked(),wispr_shortcut_mode=("toggle_ctrl_win","hold_ctrl_win","toggle_ctrl_win_space")[self.wispr_mode.currentIndex()])
         self.config=replace(self.config,touchpad_submode=("desktop","gaming","drawing")[self.submode_choice.currentIndex()],drawing_sensitivity=self.drawing_speed.value(),gaming_radius=self.gaming_radius.value(),gaming_hud=self.gaming_display.isChecked(),drawing_two_hand=self.drawing_helper.isChecked())
+        self.config=replace(self.config,touchpad_swipe_enabled=self.swipe_enabled.isChecked(),touchpad_swipe_sensitivity=self.swipe_sensitivity.value(),touchpad_swipe_cooldown=self.swipe_cooldown.value())
         if self.hand_mouse:self.hand_mouse.config=self.config
         if self.touchpad_session:self.touchpad_session.config=self.config
         self.set_state(State.READY if self.worker else State.CAMERA_OFF)
@@ -106,7 +126,7 @@ class ModesMixin:
     def save_touchpad_preferences(self):
         if not getattr(self,"persist_preferences",False):return
         from .config import save_preferences
-        keys=("touchpad_sensitivity","touchpad_hand","touchpad_submode","drawing_sensitivity","drawing_two_hand","gaming_radius","gaming_hud","touchpad_scroll_speed","touchpad_natural_scroll","touchpad_background","wispr_enabled","wispr_shortcut_mode")
+        keys=("touchpad_sensitivity","touchpad_hand","touchpad_submode","touchpad_swipe_enabled","touchpad_swipe_sensitivity","touchpad_swipe_cooldown","drawing_sensitivity","drawing_two_hand","gaming_radius","gaming_hud","touchpad_scroll_speed","touchpad_natural_scroll","touchpad_background","wispr_enabled","wispr_shortcut_mode")
         try:save_preferences({key:getattr(self.config,key) for key in keys})
         except (OSError,ValueError):self.show_error("Could not save touchpad preferences. Current-session controls still use your choices.")
 
@@ -156,13 +176,15 @@ class ModesMixin:
         paper=self.mode=="paper"; hand=self.mode=="hand_mouse"; pen=self.mode=="pen_pointer"; finger=self.mode=="finger_letters"
         drawing=hand and self.config.touchpad_submode=="drawing";gaming=hand and self.config.touchpad_submode=="gaming";desktop=hand and not drawing and not gaming
         self.touchpad_panel.setVisible(hand);self.wispr_panel.setVisible(hand);self.submode_panel.setVisible(hand)
+        self.swipe_panel.setVisible(desktop)
         self.wispr_enabled.setVisible(desktop);self.wispr_mode.setVisible(desktop)
         self.drawing_speed.setVisible(drawing);self.gaming_radius.setVisible(gaming)
         self.drawing_helper.setVisible(drawing);self.gaming_display.setVisible(gaming)
         self.hand_choice.setVisible(not gaming and not (drawing and self.config.drawing_two_hand));self.scroll_speed.setVisible(not drawing);self.natural_scroll.setVisible(not drawing)
         self.camera_heading.setText("Camera / hand tracking" if hand else ("Camera / eye tracking" if gaze else "Camera / writing area"))
         self.pause_button.setEnabled(not busy and not stopping)
-        for option in (self.hand_choice,self.submode_choice,self.drawing_speed,self.drawing_helper,self.gaming_radius,self.gaming_display,self.scroll_speed,self.natural_scroll,self.background_touchpad,self.wispr_enabled,self.wispr_mode):option.setEnabled(not mouse_active and self.pointer_deadline is None and not busy)
+        self.swipe_enabled.setEnabled(desktop and not busy and not stopping)
+        for option in (self.hand_choice,self.submode_choice,self.drawing_speed,self.drawing_helper,self.gaming_radius,self.gaming_display,self.scroll_speed,self.natural_scroll,self.background_touchpad,self.wispr_enabled,self.wispr_mode,self.swipe_sensitivity,self.swipe_cooldown):option.setEnabled(not mouse_active and self.pointer_deadline is None and not busy)
         self.dark_slate.setVisible(paper); self.ocr_variant.setVisible(paper)
         self.ocr_device.setVisible(paper);self.ocr_device.setEnabled(not busy and self.recognition_worker is None)
         self.sensitivity.setVisible(hand and not drawing);self.sensitivity.setEnabled(not mouse_active and self.pointer_deadline is None)
@@ -206,7 +228,7 @@ class ModesMixin:
         self.calibrate_button.setText("Calibrate eyes & check accuracy" if gaze else ("Select writing area" if paper else ("Calibrate pointer area" if pen else "Calibrate slate")))
         messages={
             "paper":"Write with real ink on paper or a visible slate. Select the writing area; remove your hand/pen, capture it, review the text, then explicitly send it. Camera images stay local.",
-            "hand_mouse":"Joined index + middle: point. Three fingers: scroll. Index pinch: click/select/drag; two pinches: double-click. Middle pinch: right-click. Helper open palm: precision; both open palms: pause/resume. Hold a V for Wispr, lower it to finish. Escape stops everything.",
+            "hand_mouse":"Joined index + middle: point. Three fingers: scroll. Index pinch: click/select/drag; two pinches: double-click. Middle pinch: right-click. Natural sideways air swipe with relaxed fingers: next/previous as in your latest videos; no open palm needed. Helper open palm: precision; both open palms: pause/resume. Hold a V for Wispr, lower it to finish. Escape stops everything.",
             "eye_gaze":"Local eye control: calibrate the nine-dot screen mapping. Allow unverified gaze lets you enable desktop control even if accuracy checks fail; pointing may be inaccurate. Look to point, index pinch left-clicks, middle pinch right-clicks. Escape stops and releases buttons.",
             "pen_pointer":"Experimental hover tracking requires a bright colored marker near the pen tip. Webcam-only touch/hover is not verified: this mode moves the cursor and NEVER clicks.",
             "finger_letters":"Experimental: reported inaccurate on your handwriting. Letter capture is retained for testing; use paper/slate OCR for actual ink."}

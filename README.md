@@ -9,7 +9,7 @@ Physical accuracy and long-session reliability remain experimental.
 | Mode | Input method and actions |
 |---|---|
 | Paper / slate OCR | Capture real ink from a selected webcam region, recognize locally, review/edit, then explicitly type accepted text |
-| Hand touchpad — Desktop | Joined index/middle fingers move the cursor; pinches click, double-click, drag and select; three fingers scroll; helper palm enables precision |
+| Hand touchpad — Desktop | Joined index/middle fingers move the cursor; pinches click, double-click, drag and select; three fingers scroll; helper palm enables precision; optional natural air swipes change windows |
 | Hand touchpad — Gaming | Physical left palm operates a centered WASD joystick; physical right hand moves and clicks the mouse |
 | Hand touchpad — Drawing tablet | Index-only drawing, index/middle hover and pen lift, pinch tool clicks; optional left-hand clicks with right-hand drawing |
 | Eye gaze + pinch | Experimental nine-target eye calibration and five-target accuracy check, followed by gaze pointing and pinch clicks |
@@ -22,6 +22,11 @@ for Desktop, Gaming, Drawing, background use, scrolling, shortcuts and pause/sto
 
 ## Install and run on Windows
 
+Start with the [installation and update guide](docs/SETUP_ANOTHER_WINDOWS_PC.md).
+It explains Download ZIP, Python 3.12 x64, dependencies, models, first use,
+updates, saved preferences and troubleshooting. The repository is currently
+private; installers need an account that the owner has given access.
+
 **Installing on another computer?** Follow the [step-by-step Windows setup guide](docs/SETUP_ANOTHER_WINDOWS_PC.md), including camera, CPU/GPU, mode, Wispr and calibration settings.
 
 Use Python **3.12 x64**, Windows 11, and a compatible webcam. Dependencies are pinned.
@@ -32,6 +37,7 @@ Run installation commands from the repository folder:
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
+.\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe scripts/setup_models.py
 .\.venv\Scripts\python.exe scripts/setup_alphabet.py
 .\.venv\Scripts\python.exe scripts/setup_paper.py
@@ -48,6 +54,16 @@ Gaming uses right-hand mouse / left-hand WASD roles. Drawing starts with index/m
 hover, then folding only the middle finger begins index drawing.
 
 ## Configuration
+
+### Turn window swipes off or on
+
+In **Hand touchpad → Touchpad: desktop**, uncheck **Enable window swipes**.
+You can do this while mouse controls are active: it cancels a pending swipe,
+keeps the mouse enabled and saves the choice for later launches. Recheck to
+enable swipes. For a manual override, put `"touchpad_swipe_enabled": false` in
+`config.local.json`. No open palm or deliberate wrist turn is required when
+swiping is enabled. Swipes are inactive in Gaming and Drawing. Disable controls
+before changing swipe sensitivity or cooldown.
 
 `config.json` contains portable defaults from the configuration class. Paper OCR
 is the initial mode; unverified gaze and Wispr gestures are disabled by default.
@@ -71,14 +87,14 @@ When background touchpad operation is enabled, a visible tray indicator remains.
 ## Checks and limitations
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m pytest --basetemp artifacts/pytest-install-check
 ```
 
 Tests cover gesture transitions, geometry, input ownership/release, focus loss,
 camera interruption, modes, configuration, privacy and UI behavior. Model and
 public-image integration checks need optional local assets; absent assets should
-skip those checks. Existing machine-specific reports and fixtures are excluded
-from this repository. Setup scripts obtain models; probes expecting images in
+skip those checks. Portable swipe tests include independently generated synthetic hand fixtures; original personal recordings and machine-specific
+reports are excluded. Setup scripts obtain models; probes expecting images in
 `artifacts/` require separately supplied public fixtures. Create `artifacts/`
 before running probes that write reports. Native probes send real desktop input
 to disposable test windows and should be run deliberately.
@@ -97,7 +113,8 @@ The proposed local LLM correction stage is not implemented.
 - `docs/`: general architecture, evaluation procedure and gesture guides.
 - Dependency pins, launcher and portable configuration.
 
-Personal configuration, evaluation results, logs, captures, recordings,
+Personal configuration, evaluation results, logs, captures, original recordings,
 generated artifacts, downloaded models, desktop shortcuts and the local Python
 environment are excluded. Hardware-specific reports and personal trial history
 are excluded from the documentation copy. Local workspace files are unchanged.
+

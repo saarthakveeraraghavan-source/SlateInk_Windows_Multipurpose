@@ -1,6 +1,6 @@
 # SlateInk hand touchpad guide
 
-Select Hand touchpad to use the desktop, gaming and drawing controls. Camera starts **off**. Hand tracking
+Select Hand touchpad to use these gestures. Camera starts **off**. Hand tracking
 stays on this computer; Wispr Flow handles its own microphone, transcription and
 insertion under your existing Wispr settings.
 
@@ -33,6 +33,8 @@ insertion under your existing Wispr settings.
 | Vertical scroll | Control hand: index + middle + ring extended, little finger curled, thumb away; move up/down | Up moves toward earlier content; down toward later content. Reverse scrolling flips this |
 | Horizontal scroll | Same three-finger pose; move sideways first | Scrolls sideways in apps that support it. Lower the ring finger to end scrolling and choose a new axis |
 | Precision pointing | Helper hand: open palm, all four fingers extended and thumb away | Slower, finer pointer movement while the control hand points or selects |
+| Next window | Sweep the relaxed control hand sideways toward the center, as in the latest Next_Swipe-Gesture.mp4 | One next-window switch. No open palm needed. Desktop only |
+| Previous window | Sweep in the opposite direction, as in the latest Previous_Swipe-Gesture.mp4 | One previous-window switch. Fingers can stay relaxed. Desktop only |
 | Pause / resume | Both hands: open palms held for about one second | Toggles pause. Lower/relax the pose before showing it again. Camera keeps running so resuming is possible |
 | Start Wispr Flow | Either hand: V sign, index/middle straight and spread apart, ring/little finger curled; hold steadily about 0.7 seconds | Sends your configured Ctrl+Win start shortcut once. Pointing and clicking freeze during dictation |
 | Finish Wispr and insert text | Lower the V sign, relax those fingers, or remove that hand | After a short grace period, sends Ctrl+Win once more. Wispr performs transcription and insertion |
@@ -42,6 +44,68 @@ insertion under your existing Wispr settings.
 Keep another finger extended while pinching: a relaxed closed fist is deliberately
 excluded from clicking. Clicks require opening the pinches after enabling or
 interrupted tracking. An ambiguous thumb touch between two fingertips does not click.
+
+## Swipe to change windows
+
+In **Touchpad: desktop**, use the natural sideways air strokes in your **latest**
+two recordings. Keep your fingers relaxed; you do not have to open your palm,
+straighten every finger, or deliberately turn the wrist between two poses.
+
+- **Next window:** sweep toward the center as shown in **Next_Swipe-Gesture.mp4**.
+- **Previous window:** sweep back the other way as shown in
+  **Previous_Swipe-Gesture.mp4**.
+
+Let the hand settle momentarily between strokes. Recognition arms automatically
+in about 0.1 seconds and follows the sideways motion. A folded hand can also
+swipe. Stationary hands and vertical arm movements do not change windows.
+Each stroke switches once, followed by the adjustable **0.8-second cooldown**.
+There is no required finish-pose hold or palm-opening step. Mirroring preserves
+the actions demonstrated in the videos.
+
+Pointing and clicks pause while the sideways swipe gesture is reserved. Return
+to the usual upright, joined index + middle pointing pose to resume the mouse.
+Normal pointing and three-finger scrolling keep their existing gestures.
+Two open palms still pause. An upright V still controls Wispr; a transient V-like
+estimate during an air stroke cannot start dictation, and a helper V or active
+dictation retains priority.
+
+Eligible open windows cycle in a stable order, including minimized windows;
+changing the focused window does not reorder the cycle. New windows join the
+end and closed windows leave it. SlateInk, desktop/taskbar, tool windows,
+disabled windows and windows hidden on another virtual desktop are excluded.
+This changes the focused window; it does not launch apps or change workspaces.
+
+Uncheck **Enable window swipes** to disable every next/previous air swipe.
+You can do this while mouse controls are active; a pending swipe is cancelled
+and mouse control stays enabled. The choice saves locally and survives restart.
+Recheck it to turn swiping back on. Disable controls before changing **Swipe
+sensitivity ×** (higher needs less sideways travel) or **Swipe cooldown**.
+Window switching is inactive in Gaming and Drawing.
+
+Tracking safety, two-palm pause, active dictation and helper Wispr gestures take
+priority. Swipes cannot interrupt an owned click/drag, a physical mouse button
+or a held keyboard modifier. One brief missed tracking frame during an active
+stroke can be bridged for up to 160 ms while pointer input is frozen. Switching
+still requires real, confirmed hand observations. Longer loss, stale frames,
+confidently ambiguous hand roles and large wrist jumps cancel the stroke.
+Low-confidence duplicate estimates are ignored. First-shown hand selection
+settles briefly at startup rather than permanently locking a single wrong label.
+
+Windows foreground restrictions still apply. The switch uses a brief owned Alt
+press and the standard foreground API, releases Alt immediately, and stops hand
+control if Windows does not confirm activation. No system focus settings change.
+The activation rules are documented by Microsoft in
+[SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+and [LockSetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-locksetforegroundwindow).
+
+Validation on 12 October 2026 replayed both latest supplied recordings through the real
+local tracker and full Desktop session, with exactly one correctly named switch
+and zero mouse/voice events in each recording, mirrored and unmirrored. Recorded
+hand observations also drove actual native focus changes among three disposable
+Windows windows with ordinary permissions. The probe verified stable cycling,
+minimized-window restoration, window filtering, Alt release and fixture cleanup.
+All 339 regression tests passed. No live camera was opened; a fresh live-hand
+trial and long-session comfort remain untested.
 
 ## Gaming sub-mode
 
@@ -132,11 +196,11 @@ show right index + middle to return to hover. The left hand's position never
 changes the drawing filter, scale or coordinates. Turning the option off
 restores the existing single-hand workflow.
 
-## Optional Wispr Flow integration
+## Wispr Flow with your configuration
 
-The default shortcut binding is **Ctrl+Win: press once to start, press again to
-stop**. Enable the optional voice gesture only when the selected binding matches
-Wispr's settings. SlateInk does not change those settings. Wispr Flow must already be running, signed in and working normally.
+Your confirmed configuration is **Ctrl+Win: press once to start, press again to
+stop**. SlateInk's dropdown is set to that behavior; it does not change Wispr's
+settings. Wispr Flow must already be running, signed in and working normally.
 
 1. Focus an ordinary textbox so its caret is visible. Release keyboard modifiers.
 2. Use a steady V sign with the helper hand, or the control hand if using one hand.

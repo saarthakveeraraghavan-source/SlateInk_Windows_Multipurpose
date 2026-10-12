@@ -10,6 +10,7 @@ class Hand:
     landmarks: tuple
     ratio: float | None
     label: str
+    handedness_confidence: float = 1.0
 
     @property
     def index(self):
@@ -44,7 +45,7 @@ class HandTracker:
         hands=[]
         for landmarks,handedness in zip(result.hand_landmarks,result.handedness):
             points=tuple((p.x,p.y,p.z) for p in landmarks)
-            hands.append(Hand(points,pinch_ratio(points,rgb.shape[1]/rgb.shape[0]),handedness[0].category_name))
+            hands.append(Hand(points,pinch_ratio(points,rgb.shape[1]/rgb.shape[0]),handedness[0].category_name,handedness[0].score))
         return tuple(hands),latency
 
     def close(self):

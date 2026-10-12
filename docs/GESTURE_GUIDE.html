@@ -4,7 +4,7 @@
 <style>body{font:16px/1.6 system-ui,sans-serif;color:#172536;background:#eef2f7;margin:0}main{max-width:880px;margin:32px auto;padding:28px;background:white;border-radius:12px}h1,h2{line-height:1.25}table{border-collapse:collapse;width:100%;margin:18px 0}td,th{text-align:left;border-bottom:1px solid #dce4ed;padding:10px}th{background:#e8f4f1}aside{padding:14px;background:#e8f4f1;border-radius:8px}a{color:#087f71}nav a{margin-right:20px}@media(max-width:600px){main{margin:0;padding:20px}}</style>
 <main><h1>SlateInk hand touchpad</h1>
 <p>Choose a touchpad sub-mode before enabling controls. Camera and desktop input start off. Focus the destination app during the three-second countdown.</p>
-<nav><a href="#desktop">Desktop</a><a href="#gaming">Gaming</a><a href="#drawing">Drawing tablet</a><a href="#stop">Pause and stop</a></nav>
+<nav><a href="#desktop">Desktop</a><a href="#swipe">Window swipe</a><a href="#gaming">Gaming</a><a href="#drawing">Drawing tablet</a><a href="#stop">Pause and stop</a></nav>
 <h2 id="desktop">Desktop</h2>
 <p>Choose the control hand, or show your preferred hand first with “first shown.” Open both pinches briefly to arm.</p>
 <table><tr><th>Gesture</th><th>Action</th></tr>
@@ -14,8 +14,17 @@
 <tr><td>Thumb + middle pinch and release</td><td>Right click; keep another finger extended.</td></tr>
 <tr><td>Index + middle + ring extended, little curled</td><td>Scroll up/down; move sideways first for horizontal scrolling.</td></tr>
 <tr><td>Helper hand open palm</td><td>Slower precision pointing.</td></tr>
+<tr><td>Relaxed control hand: sweep sideways toward the center</td><td>Next window, matching the latest Next_Swipe-Gesture.mp4. No open palm needed. Desktop only.</td></tr>
+<tr><td>Relaxed control hand: sweep back the other way</td><td>Previous window, matching the latest Previous_Swipe-Gesture.mp4. Desktop only.</td></tr>
 <tr><td>Steady V sign for about 0.7 seconds</td><td>Start Wispr if enabled; lower the V to finish. Wait for Wispr’s own ping before speaking.</td></tr></table>
 <p>Wispr must already be running with the configured shortcut. The saved setting is Ctrl+Win: press to start/stop. SlateInk does not read or save its transcript. Wispr gestures are active only in Desktop.</p>
+<h2 id="swipe">Swipe to change windows</h2>
+<p>In <strong>Touchpad: desktop</strong>, use the relaxed sideways air strokes in your <strong>latest</strong> recordings. <strong>Next:</strong> sweep toward the center as in Next_Swipe-Gesture.mp4. <strong>Previous:</strong> sweep back the other way as in Previous_Swipe-Gesture.mp4. You do not need an open palm, straight fingers or a deliberate wrist turn. Mirrored and unmirrored previews preserve the demonstrated actions.</p>
+<p>Let the hand settle momentarily between strokes; recognition arms automatically in about 0.1 seconds. Folded hands can also swipe. Each stroke fires once, followed by the adjustable <strong>0.8-second cooldown</strong>. A stationary hand or vertical arm movement does not switch. There is no required finish-pose hold. Pointer actions pause during a recognized swipe; return to upright joined index + middle to point again. Two open palms still pause.</p>
+<p>Windows cycle in a stable order, including minimized windows. New windows join the end; closed windows leave. SlateInk, desktop/taskbar, tool windows, disabled windows and windows hidden on other virtual desktops are excluded. Swipes do not launch apps or change workspaces.</p>
+<p>Uncheck <strong>Enable window swipes</strong> to disable next/previous gestures. This works while mouse controls are active, cancels a pending swipe and keeps the mouse enabled. Your choice is saved for later launches; recheck to enable swipes. Disable controls before adjusting <strong>Swipe sensitivity ×</strong> (higher needs less sideways travel) or <strong>Swipe cooldown</strong>. Swipes are inactive in Gaming and Drawing and cannot interrupt clicks, drags, physical mouse buttons, keyboard modifiers or active dictation. Brief tracking gaps up to 160 ms can be bridged during a reserved stroke, with input frozen; switching requires real hand observations. Longer loss, stale frames, confident ambiguity and large wrist jumps cancel. Low-confidence duplicate detections are ignored.</p>
+<p>Tracking safety, two-palm pause, active dictation and helper V gestures retain priority. A transient V-like estimate during a natural control-hand stroke cannot start dictation. Windows activation uses a brief Alt press with immediate release and the standard foreground API. If Windows does not confirm the switch, hand control stops without automatic retry.</p>
+<p>Both latest recordings passed the real local tracker and Desktop session with one intended window request and no mouse or voice actions, mirrored and unmirrored. Recorded observations also passed actual Windows switching tests. All 339 regression tests passed. A fresh live-hand trial is still needed.</p>
 <h2 id="gaming">Gaming</h2>
 <p>Choose <strong>Touchpad: gaming</strong>. Your physical right hand uses the existing mouse gestures. Your left hand steers. Keep both visible; mirroring on is recommended.</p>
 <p>Hold the left palm still for about 0.3 seconds with at least three fingers extended to set a comfortable center. No initial fist is needed. Move that palm as a small joystick:</p>

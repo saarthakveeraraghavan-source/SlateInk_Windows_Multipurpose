@@ -1,12 +1,16 @@
 """Two-hand roles, precision, pause and deliberate Wispr gesture coordination."""
 from .hand_gestures import open_palm,victory,DwellPose
 from .touchpad_submodes import GamingController,DrawingController
+from .air_swipe import WindowSwipe
 
 
 class TouchpadSession:
-    def __init__(self,controller,shortcuts,movement_keys=None):
+    def __init__(self,controller,shortcuts,movement_keys=None,window_switcher=None):
         self.controller=controller;self.shortcuts=shortcuts
         self.config=controller.config;self.paused=False;self.chosen_label=None
+        self.swipe=WindowSwipe();self.window_switcher=window_switcher
+        self.last_submode=self.config.touchpad_submode
+        self.chosen_since=None;self.hand_role_locked=False
         self.pause_pose=DwellPose(hold=.9);self.voice_pose=DwellPose(hold=.7)
         self.voice_started=None;self.voice_end_since=None;self.primary=None;self.helper=None
         self.gaming=GamingController(self.config,movement_keys)
@@ -16,10 +20,14 @@ class TouchpadSession:
     def button_held(self):return "left" if self.config.touchpad_submode=="drawing" and (self.drawing.held or self.drawing.click_held) else self.controller.button_held
 
     def release_inputs(self):
-        try:self.gaming.interrupt()
+        self.swipe.reset()
+        try:
+            if self.window_switcher:self.window_switcher.release_all()
         finally:
-            try:self.drawing.interrupt()
-            finally:self.controller.interrupt()
+            try:self.gaming.interrupt()
+            finally:
+                try:self.drawing.interrupt()
+                finally:self.controller.interrupt()
 
     @property
     def dictating(self):return self.voice_started is not None
@@ -36,13 +44,14 @@ class TouchpadSession:
     def set_enabled(self,value):
         self.controller.enabled=False;self.interrupt();self.controller.set_enabled(value)
         self.paused=False;self.chosen_label=None
+        self.chosen_since=None;self.hand_role_locked=False
 
     def toggle_pause(self):
         self.interrupt();self.paused=not self.paused
         if self.config.touchpad_submode=="gaming":return "Gaming paused — Ctrl+Alt+M resumes." if self.paused else "Gaming resumed — hold your left palm still to center."
         return "Hand touchpad paused — show both open palms or press Ctrl+Alt+M to resume." if self.paused else "Hand touchpad resumed — open pinches, then join index + middle."
 
-    def choose_hands(self,hands):
+    def choose_hands(self,hands,t=None):
         if len(hands)>2 or len({h.label for h in hands})!=len(hands):return None,None
         if self.config.touchpad_submode=="gaming" or (self.config.touchpad_submode=="drawing" and self.config.drawing_two_hand):
             # This installed Tasks model labels the unmirrored public left-hand
@@ -52,7 +61,17 @@ class TouchpadSession:
             return next((h for h in hands if h.label==right),None),next((h for h in hands if h.label!=right),None)
         wanted=self.config.touchpad_hand
         if wanted=="auto":
-            if self.chosen_label is None and hands:self.chosen_label=hands[0].label
+            if self.chosen_label is None and hands:
+                self.chosen_label=hands[0].label;self.chosen_since=t
+            if len(hands)==2:self.hand_role_locked=True
+            # Establish first-shown identity over a short acquisition interval.
+            # The new previous video begins with a one-frame wrong label;
+            # permanently locking that first estimate loses the actual hand.
+            if not self.hand_role_locked and len(hands)==1 and t is not None:
+                if hands[0].label!=self.chosen_label:
+                    self.chosen_label=hands[0].label;self.chosen_since=t
+                elif self.chosen_since is not None and t-self.chosen_since>=.15:
+                    self.hand_role_locked=True
             wanted=self.chosen_label
         primary=next((h for h in hands if h.label==wanted),None)
         helper=next((h for h in hands if h.label!=wanted),None)
@@ -60,11 +79,17 @@ class TouchpadSession:
 
     def process(self,hands,t,age=0,aspect=4/3):
         if not self.controller.enabled:return "Touchpad off."
+        if self.last_submode!=self.config.touchpad_submode:
+            self.interrupt();self.last_submode=self.config.touchpad_submode
         if age>.2:
             self.interrupt();return "Camera tracking stale — input released and dictation cancelled."
+        if self.config.touchpad_submode=="desktop" and self.config.touchpad_swipe_enabled:
+            # The new next recording contains a low-confidence duplicate hand
+            # during motion blur. It is not an established second hand role.
+            hands=tuple(h for h in hands if h.handedness_confidence>=.6)
         if len(hands)>2 or len({h.label for h in hands})!=len(hands):
             self.interrupt();return "Hand roles unclear — input released. Separate your hands."
-        self.primary,self.helper=self.choose_hands(hands)
+        self.primary,self.helper=self.choose_hands(hands,t)
         # Left joystick already uses a palm. A relaxed right mouse hand can
         # also have all four fingers extended; that must not pause gameplay.
         both_open=self.config.touchpad_submode!="gaming" and open_palm(self.primary,aspect) and open_palm(self.helper,aspect)
@@ -87,12 +112,25 @@ class TouchpadSession:
             return self.drawing.process(self.primary,t,age,aspect,click_hand=self.helper,split_click=self.config.drawing_two_hand)
         pose=victory(self.helper,aspect) or victory(self.primary,aspect)
         if not self.config.wispr_enabled:pose=False
+        # A natural control-hand stroke can briefly resemble a V as tracking
+        # changes finger counts. Its reserved sideways pose wins that transient
+        # estimate; a deliberate helper V and active dictation retain priority.
+        if not self.dictating and not (self.config.wispr_enabled and victory(self.helper,aspect)):
+            if self.config.touchpad_swipe_enabled and self.window_switcher:
+                freeze,direction=self.swipe.update(self.primary,t,self.config,aspect,
+                    blocked=self.controller.button_held is not None or self.controller.dragging or t<self.controller.release_until,age=age)
+                if freeze:
+                    self.voice_pose.reset();self.controller.interrupt()
+                    if direction is not None:return self.window_switcher.switch(direction)
+                    return "Air swipe ready — sweep your relaxed hand sideways. No open palm needed."
+            else:self.swipe.reset()
         requested=self.voice_pose.update(pose,t)
         if requested and not self.dictating and self.shortcuts:
             self.controller.interrupt()
             self.shortcuts.begin(self.config.wispr_shortcut_mode)
             self.voice_started=t;self.voice_end_since=None
         if self.dictating:
+            self.swipe.reset()
             self.controller.interrupt() # Keep the selected textbox/cursor stable.
             if not self.shortcuts.target_unchanged():
                 self.interrupt();return "Dictation cancelled because the focused textbox/window changed."
@@ -103,5 +141,6 @@ class TouchpadSession:
                 return "Wispr stop shortcut sent — wait for Flow to insert text; open pinches to resume pointing."
             return "Wispr gesture active — speak after Flow's ping; lower the V gesture to finish."
         if pose:
+            self.swipe.reset()
             self.controller.interrupt();return "Hold the V gesture steadily to start Wispr."
         return self.controller.process(self.primary,t,age,aspect,precision=open_palm(self.helper,aspect))

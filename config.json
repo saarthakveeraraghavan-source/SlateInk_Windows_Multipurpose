@@ -32,5 +32,8 @@
   "touchpad_drag_threshold": 0.012,
   "touchpad_background": true,
   "wispr_enabled": false,
-  "wispr_shortcut_mode": "toggle_ctrl_win"
+  "wispr_shortcut_mode": "toggle_ctrl_win",
+  "touchpad_swipe_enabled": true,
+  "touchpad_swipe_sensitivity": 1.0,
+  "touchpad_swipe_cooldown": 0.8
 }

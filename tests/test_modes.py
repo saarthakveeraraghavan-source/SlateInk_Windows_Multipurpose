@@ -44,6 +44,54 @@ def test_default_paper_mode_never_enables_desktop_mouse(window):
     assert window.pointer_deadline is None
 
 
+def test_swipe_settings_apply_only_in_desktop_and_lock_while_active(window):
+    window.mode_choice.setCurrentIndex(1)
+    assert not window.swipe_panel.isHidden()
+    window.swipe_sensitivity.setValue(1.4);window.swipe_cooldown.setValue(1.2)
+    assert window.config.touchpad_swipe_sensitivity==1.4
+    assert window.touchpad_session.config.touchpad_swipe_cooldown==1.2
+    window.swipe_enabled.setChecked(False)
+    assert not window.config.touchpad_swipe_enabled
+    for mode in (1,2):
+        window.submode_choice.setCurrentIndex(mode)
+        assert window.swipe_panel.isHidden()
+    window.submode_choice.setCurrentIndex(0);window.worker=Worker()
+    window.refresh_controls();window.toggle_pointer()
+    assert not window.swipe_sensitivity.isEnabled()
+    window.pointer_tick(window.pointer_deadline+.01)
+    assert window.swipe_enabled.isEnabled() and not window.swipe_cooldown.isEnabled()
+    window.touchpad_session.swipe.capturing=True
+    window.swipe_enabled.setChecked(True)
+    assert window.hand_mouse.enabled and not window.touchpad_session.swipe.capturing
+    window.swipe_enabled.setChecked(False)
+    assert window.hand_mouse.enabled and not window.config.touchpad_swipe_enabled
+    window.stop_pointer();window.refresh_controls()
+    assert window.swipe_sensitivity.isEnabled()
+
+
+def test_live_swipe_toggle_saves_choice_and_preserves_active_mouse(window,tmp_path,monkeypatch):
+    import slateink.config as config_module
+    from test_touchpad_submodes import Pixels
+    from test_air_swipe import air_pose
+    from test_window_swipe import Switcher
+    monkeypatch.setattr(config_module,"ROOT",tmp_path)
+    window.persist_preferences=True
+    window.mode_choice.setCurrentIndex(1);window.worker=Worker()
+    mouse=Pixels();window.hand_mouse.sink=mouse
+    switcher=Switcher();window.touchpad_session.window_switcher=switcher
+    window.refresh_controls();window.toggle_pointer();window.pointer_tick(window.pointer_deadline+.01)
+    assert window.hand_mouse.enabled
+    window.touchpad_session.swipe.capturing=True
+    window.swipe_enabled.setChecked(False)
+    assert window.hand_mouse.enabled and not window.touchpad_session.swipe.capturing
+    assert not config_module.load_config().touchpad_swipe_enabled
+    for i in range(20):
+        window.touchpad_session.process((air_pose(min(1,i/8),mirrored=True),),1+i*.05,aspect=16/9)
+    assert not switcher.events
+    window.swipe_enabled.setChecked(True)
+    assert config_module.load_config().touchpad_swipe_enabled and window.hand_mouse.enabled
+
+
 def test_paper_results_require_preview_and_acceptance(window):
     window.recognition_kind="paper";window.set_state(State.PROCESSING)
     window.recognized(Recognition("Hello world",0.99,0.1))
