@@ -105,8 +105,9 @@ class WindowsMouse:
 class HandMouseController:
     def __init__(self,config,sink):
         self.config=config; self.sink=sink
-        self.left=Pinch(config.pinch_down_ratio,config.pinch_up_ratio,config.pinch_debounce_ms)
-        self.right=Pinch(config.pinch_down_ratio,config.pinch_up_ratio,config.pinch_debounce_ms)
+        self.left=Pinch(config.pinch_down_ratio,config.pinch_up_ratio,config.pinch_debounce_ms,
+                        press_debounce_ms=25,latch_press=True)
+        self.right=Pinch(config.pinch_down_ratio,config.pinch_up_ratio,config.pinch_debounce_ms,press_debounce_ms=100)
         self.filter=OneEuro(min_cutoff=1.4,beta=0.25)
         self.enabled=False; self.surface=None
         self.last=None; self.label=None; self.button_held=None
@@ -114,6 +115,7 @@ class HandMouseController:
         self.reference=None; self.clutched=False; self.clutch_since=None; self.pressed_at=None
         self.press_anchor=None;self.dragging=False;self.release_until=0
         self.scroll_filter=OneEuro(min_cutoff=2,beta=.3);self.scroll_reference=None;self.scroll_axis=None;self.scroll_remainder=0
+        self.click_kind=None;self.click_origin=None
 
     def interrupt(self):
         try:self.sink.release_all()
@@ -122,6 +124,7 @@ class HandMouseController:
             self.filter.reset(); self.last=None; self.label=None
             self.reference=None; self.clutched=False; self.clutch_since=None; self.pressed_at=None
             self.press_anchor=None;self.dragging=False;self.release_until=0;self.reset_scroll()
+            self.click_kind=None;self.click_origin=None
 
     def reset_scroll(self):
         self.scroll_filter.reset();self.scroll_reference=None;self.scroll_axis=None;self.scroll_remainder=0
@@ -150,6 +153,26 @@ class HandMouseController:
         # Knuckles move less than fingertips during a pinch; no screen XY map.
         return ((hand.landmarks[5][0]+hand.landmarks[9][0])/2,
                 (hand.landmarks[5][1]+hand.landmarks[9][1])/2)
+
+    def observe_open(self,hand,t,aspect=4/3):
+        """Remember a visible open pinch while another gesture owns movement.
+
+        An idle open palm reserves the swipe channel, but is also valid evidence
+        that the thumb/index have separated. Never inject input from this path.
+        """
+        if not visible_control(hand) or hand.ratio is None:
+            self.interrupt();return
+        right=middle_pinch_ratio(hand,aspect)
+        if hand.ratio<self.config.pinch_up_ratio or right is None or right<self.config.pinch_up_ratio:
+            self.interrupt();return
+        point=self._anchor(hand)
+        if (self.button_held is not None or (self.label is not None and self.label!=hand.label)
+                or (self.last is not None and (not 0<t-self.last[1]<=.2
+                    or hypot(point[0]-self.last[0][0],point[1]-self.last[0][1])>.25))):self.interrupt()
+        self.label=hand.label;self.last=(point,t)
+        self.left.update(hand.ratio,t);self.right.update(right,t)
+        self.reference=None;self.filter.reset();self.reset_scroll()
+        self.clutched=False;self.clutch_since=None;self.click_kind=None;self.click_origin=None
 
     def _stick(self,hand,aspect):
         p=hand.landmarks
@@ -195,17 +218,54 @@ class HandMouseController:
         if left_ratio is None or right_ratio is None or not isfinite(left_ratio) or not isfinite(right_ratio):
             self.interrupt(); return "Pinch landmarks unavailable — buttons released."
         extended=fingers(hand,aspect)
-        if (left_ratio<self.config.pinch_down_ratio and not any(extended[1:])) or (right_ratio<self.config.pinch_down_ratio and not (extended[0] or any(extended[2:]))):
-            self.interrupt();return "Closed/resting hand — no click. Keep another finger extended when pinching."
+        if (left_ratio<self.config.pinch_down_ratio and right_ratio<self.config.pinch_down_ratio
+                and self.button_held in (None,"left")):
+            def radial(tip,pip):
+                d=lambda i:hypot((points[i][0]-points[0][0])*aspect,points[i][1]-points[0][1])
+                return d(tip)/max(d(pip),.025)
+            # When joined fingertips both approach the thumb, an explicitly
+            # folded index with a straight middle still means LEFT click.
+            # Equal/unclear finger shapes retain the ambiguous-pinch guard.
+            if radial(8,6)<1.05 and radial(12,10)>1.18:
+                right_ratio=self.config.pinch_up_ratio+.01
         # Thumb touching both fingers is ambiguous. Never switch a left drag
         # into a right click; release and require deliberate open gestures.
         resolved=resolve_pinches(left_ratio,right_ratio,self.config,self.button_held)
         if resolved is None:
             self.interrupt(); return "Both pinches detected — open index and middle fingers to re-arm."
         left_ratio,right_ratio=resolved
+        if (self.button_held is None and right_ratio<self.config.pinch_down_ratio
+                and (left_ratio-right_ratio<.15 or right_ratio>left_ratio*.7)):
+            # A thumb merely passing near middle while aiming for index must
+            # not become a context-menu click on the threshold boundary.
+            right_ratio=self.config.pinch_up_ratio+.01
+        # Test the supporting fingers only AFTER choosing the pinch target.
+        # A valid left pinch can also lie near middle; the irrelevant middle
+        # distance must not reject it for having the index (correctly) curled.
+        # An OK-shaped index pinch can have the other fingers comfortably
+        # curled. Its contact remains beyond the knuckles; a resting fist's
+        # fingertips fold back into the palm instead.
+        axis=((points[9][0]-points[0][0])*aspect,points[9][1]-points[0][1])
+        axis_length=hypot(*axis)
+        palm=hypot((points[5][0]-points[17][0])*aspect,points[5][1]-points[17][1])
+        ahead=sum(a*b for a,b in zip(((points[8][0]-points[5][0])*aspect,points[8][1]-points[5][1]),axis))/max(axis_length,.025)
+        index_contact=ahead>palm*.12
+        if (left_ratio<self.config.pinch_down_ratio and not (any(extended[1:]) or index_contact)) or (right_ratio<self.config.pinch_down_ratio and not (extended[0] or any(extended[2:]))):
+            self.interrupt();return "Closed/resting hand — no click. Keep another finger extended when pinching."
+        if self.button_held is None:
+            kind="left" if left_ratio<self.config.pinch_down_ratio else ("right" if right_ratio<self.config.pinch_down_ratio else None)
+            if kind!=self.click_kind:
+                self.click_kind=kind;self.click_origin=point if kind else None
+            elif kind is not None:
+                palm=hypot((points[5][0]-points[17][0])*aspect,points[5][1]-points[17][1])
+                drift=hypot((point[0]-self.click_origin[0])*aspect,point[1]-self.click_origin[1])
+                if drift>palm*(.65 if kind=="left" else .25):
+                    self.interrupt();return "Pinch moved too quickly — open the pinch and click with the hand briefly still."
         left_down=self.left.update(left_ratio,t)
         right_down=self.right.update(right_ratio,t)
-        if not (self.left.released and self.right.released):return "Open index/thumb and middle/thumb pinches to arm mouse."
+        if right_down and not self.left.released:
+            self.right.reset();right_down=False
+        if not self.left.released and not self.right.released:return "Open index/thumb and middle/thumb pinches to arm mouse."
         if left_down and right_down:
             self.interrupt(); return "Ambiguous gesture — buttons released."
         wanted="left" if left_down else ("right" if right_down else None)

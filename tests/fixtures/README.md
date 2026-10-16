@@ -1,17 +1,12 @@
-# Portable synthetic swipe fixtures
+# Portable swipe fixtures
 
-`natural_swipe_reference_landmarks.json` contains independently generated,
-generic hand coordinates. It has no measurements, hashes, images, audio or
-other data extracted from the developer's personal reference videos.
+`open_palm_swipe_synthetic.json` contains independently generated generic open
+right-hand sweeps with both mirror settings. `fist_swipe_synthetic.json` checks
+that the retired fist gesture cannot switch windows. The older
+`natural_swipe_reference_landmarks.json` is a legacy synthetic fixture retained
+for compatibility. None contains measurements from personal videos.
 
-The sequences exercise next/previous direction, preview mirroring, a temporary
-low-confidence duplicate, one missing observation, and transient handedness
-misclassification. Tests also vary update rates, sensitivity and interruption
-conditions. These deterministic checks verify the detector's behavior; they
-do not establish physical gesture accuracy on a user's camera.
-
-`scripts/native_window_swipe_probe.py` uses these synthetic sequences with
-disposable Windows windows. `scripts/analyze_swipe_references.py` and
-`scripts/replay_swipe_references.py` require separately supplied local videos
-to check actual tracking. Personal recordings and their extracted observations
-remain outside this published package.
+Original recordings and their extracted observations remain local. Tests that
+need those optional observations are skipped in this source-only package.
+Native probes use disposable windows. These tests verify software behavior;
+physical recognition and comfort need a live tryout.

@@ -21,6 +21,7 @@ from .rendering import render_strokes
 from .state import State
 from .widgets import CameraView, InkView
 from .modes import ModesMixin
+from .camera_preview import CameraPreviewMixin
 
 LOG = logging.getLogger("slateink")
 
@@ -69,7 +70,7 @@ QLineEdit, QComboBox { background:white; padding:5px; border:1px solid #bccbd9; 
 """
 
 
-class MainWindow(ModesMixin,QMainWindow):
+class MainWindow(CameraPreviewMixin,ModesMixin,QMainWindow):
     def __init__(self, config=None,persist_preferences=False):
         super().__init__()
         self.config = config or load_config()
@@ -99,6 +100,7 @@ class MainWindow(ModesMixin,QMainWindow):
         self.pending_letter = None
         self.resume_after_letter = False
         self.restart_after_orientation = False
+        self.camera_preview=None;self.gesture_caption_pending=False
         self.initialize_modes()
         self.injector = None
         try:
@@ -183,6 +185,11 @@ class MainWindow(ModesMixin,QMainWindow):
         for b in (self.camera_button,self.calibrate_button,self.capture_button,self.undo_button,self.clear_button):
             toolbar.addWidget(b)
         toolbar.addStretch()
+        self.camera_preview_choice=QCheckBox("Floating camera preview")
+        self.camera_preview_choice.setChecked(self.config.camera_preview_enabled)
+        self.camera_preview_choice.setToolTip("Show the same camera feed above other windows in every mode. Drag its header to place it; × hides it. Position and choice are saved.")
+        self.camera_preview_choice.toggled.connect(self.set_camera_preview)
+        toolbar.addWidget(self.camera_preview_choice)
         toolbar.addWidget(self.stop_button)
         layout.addLayout(toolbar)
         self.hint = QLabel("Start camera, then Enable desktop mouse — no area calibration is needed." if self.mode=="hand_mouse" else "Start the camera, check orientation, then select the area for this mode.")
@@ -330,6 +337,7 @@ class MainWindow(ModesMixin,QMainWindow):
         self.delay.setEnabled(not busy)
         self.discard_button.setEnabled(bool(self.controller.buffer.strokes) or self.result_valid or self.pending_letter is not None or busy)
         self.refresh_modes(busy,stopping)
+        self.sync_camera_preview()
 
     def sync_text(self):
         self.result_valid=bool(self.preview.toPlainText().strip())
@@ -760,10 +768,11 @@ class MainWindow(ModesMixin,QMainWindow):
                 self.ink_view.update()
                 self.refresh_controls()
             elif self.last_packet_time is not None and now-self.last_packet_time > 0.2:
+                self.sync_camera_preview()
                 self.controller.interrupt()
                 if self.hand_mouse is not None:
                     try:
-                        if self.mode=="hand_mouse" and self.touchpad_session:self.touchpad_session.interrupt()
+                        if self.mode=="hand_mouse" and self.touchpad_session:self.touchpad_session.tracking_stale()
                         else:self.hand_mouse.interrupt()
                     except InjectionError as exc:self.stop_pointer(); self.show_error(str(exc))
                 self.pen_filter.reset()
@@ -772,7 +781,7 @@ class MainWindow(ModesMixin,QMainWindow):
                     except InjectionError as exc:self.stop_pointer();self.show_error(str(exc))
                 if self.mode=="eye_gaze":self.hint.setText("Eye tracking stale — buttons released and cursor paused.")
                 if self.mode=="hand_mouse" and self.hand_mouse is not None and self.hand_mouse.enabled:
-                    self.hint.setText("Tracking stale — all held input released. Re-arm the selected sub-mode to resume.")
+                    self.hint.setText("Wispr listening — same-hand index + pinky + thumb finishes when tracking returns." if self.touchpad_session.dictating else "Tracking stale — all held input released. Re-arm the selected sub-mode to resume.")
                     self.hand_label.setText("Tracking stale · Held input released")
                 if self.state == State.WRITING:
                     self.set_state(State.READY)
@@ -784,11 +793,11 @@ class MainWindow(ModesMixin,QMainWindow):
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
-            if not self.can_background_touchpad():self.emergency_stop()
+            self.handle_background_window()
 
     def hideEvent(self, event):
         if not self.closing:
-            if not self.can_background_touchpad():self.emergency_stop()
+            self.handle_background_window()
         super().hideEvent(event)
 
     def closeEvent(self, event):
@@ -807,17 +816,57 @@ class MainWindow(ModesMixin,QMainWindow):
         self.paper_recognizer=None; self.latest_rgb=None
         if self.desktop_hotkey:self.desktop_hotkey.close()
         if self.tray:self.tray.hide()
+        if self.camera_preview:self.camera_preview.view.clear();self.camera_preview.hide()
         event.accept()
+
+    def handle_gesture_caption(self,hit):
+        if hit not in (8,9,20) or self.gesture_caption_pending or self.closing:return False
+        if not self.mouse_sink or "left" not in self.mouse_sink.held:return False
+        self.gesture_caption_pending=True
+        def act():
+            self.gesture_caption_pending=False
+            if self.closing:return
+            try:
+                if self.touchpad_session:self.touchpad_session.interrupt()
+                if self.gaze_controller:self.gaze_controller.interrupt()
+                self.mouse_sink.release_all()
+            except InjectionError as error:self.stop_pointer();self.show_error(str(error));return
+            if hit==8:self.showMinimized()
+            elif hit==9:self.showNormal() if self.isMaximized() else self.showMaximized()
+            else:self.close()
+        QTimer.singleShot(0,act)
+        return True
+
+    def nativeEvent(self,event_type,message):
+        if sys.platform=="win32":
+            import ctypes
+            from ctypes import wintypes
+            msg=ctypes.cast(int(message),ctypes.POINTER(wintypes.MSG)).contents
+            if msg.message==0x00A1 and self.handle_gesture_caption(int(msg.wParam)):
+                # Consume only our owned gesture click, avoiding the native
+                # caption-button tracking loop that blocks gesture release.
+                return True,0
+        return super().nativeEvent(event_type,message)
 
 
 def run(start_camera=False,mode=None):
     app = QApplication(sys.argv)
     app.setApplicationName("SlateInk")
+    from .single_instance import SingleInstance
+    from PySide6.QtWidgets import QMessageBox
+    guard=SingleInstance()
+    try:
+        if not guard.acquire():return 0
+    except RuntimeError as error:
+        QMessageBox.information(None,"SlateInk",str(error));return 1
     config=load_config()
     if mode:config=replace(config,initial_mode=mode,camera_width=1280 if mode=="paper" else 640,camera_height=720 if mode=="paper" else 480)
     window = MainWindow(config,persist_preferences=True)
+    def show_existing():window.showNormal();window.raise_();window.activateWindow()
+    guard.show_requested.connect(show_existing)
     window.show()
     window.install_desktop_controls()
     if start_camera:
         QTimer.singleShot(250,window.start_camera)
-    return app.exec()
+    try:return app.exec()
+    finally:guard.close()

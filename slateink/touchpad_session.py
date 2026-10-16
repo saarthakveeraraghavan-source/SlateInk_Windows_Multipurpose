@@ -1,5 +1,5 @@
 """Two-hand roles, precision, pause and deliberate Wispr gesture coordination."""
-from .hand_gestures import open_palm,victory,DwellPose
+from .hand_gestures import open_palm,voice_symbol,DwellPose,ConfirmedPose
 from .touchpad_submodes import GamingController,DrawingController
 from .air_swipe import WindowSwipe
 
@@ -11,8 +11,9 @@ class TouchpadSession:
         self.swipe=WindowSwipe();self.window_switcher=window_switcher
         self.last_submode=self.config.touchpad_submode
         self.chosen_since=None;self.hand_role_locked=False
-        self.pause_pose=DwellPose(hold=.9);self.voice_pose=DwellPose(hold=.7)
-        self.voice_started=None;self.voice_end_since=None;self.primary=None;self.helper=None
+        self.swipe_quiet_until=0
+        self.pause_pose=DwellPose(hold=.9);self.voice_pose=ConfirmedPose();self.voice_stop=ConfirmedPose(hold=.06)
+        self.voice_started=None;self.voice_hand=None;self.voice_candidate=None;self.primary=None;self.helper=None
         self.gaming=GamingController(self.config,movement_keys)
         self.drawing=DrawingController(self.config,controller.sink,movement_keys.target if movement_keys else None)
 
@@ -38,13 +39,39 @@ class TouchpadSession:
         finally:
             try:self.release_inputs()
             finally:
-                self.voice_started=None;self.voice_end_since=None
-                self.voice_pose.reset();self.pause_pose.reset();self.primary=None;self.helper=None
+                self.voice_started=None;self.voice_hand=None;self.voice_candidate=None
+                self.voice_pose.reset();self.voice_stop.reset();self.pause_pose.reset();self.primary=None;self.helper=None
+
+    def tracking_stale(self):
+        self.release_inputs();self.voice_pose.reset();self.voice_stop.reset();self.voice_candidate=None
+        if self.dictating:return self.process_dictation((),None)
+        self.primary=self.helper=None
+        return "Tracking stale — input released. Open the pinch to resume."
+
+    def process_dictation(self,hands,t,aspect=4/3):
+        self.release_inputs()
+        if not self.shortcuts.target_unchanged():
+            self.interrupt();return "Dictation cancelled because the focused textbox/window changed."
+        # Hand disappearance, other poses, duplicate labels and the other hand
+        # never end a latched recording. Stop needs the initiating hand again.
+        trusted=[h for h in hands if h.label==self.voice_hand and h.handedness_confidence>=.65]
+        unambiguous=len(hands)<=2 and len({h.label for h in hands})==len(hands)
+        self.primary,self.helper=self.choose_hands(hands,t) if unambiguous else (None,None)
+        stop=unambiguous and len(trusted)==1 and voice_symbol(trusted[0],aspect)=="stop"
+        if t is None:self.voice_stop.reset()
+        elif self.voice_stop.update(stop,t):
+            self.shortcuts.finish();self.voice_started=None;self.voice_hand=None
+            self.voice_pose.reset();self.voice_stop.reset();self.voice_candidate=None;self.pause_pose.reset()
+            return "Wispr stop shortcut sent — wait for Flow to insert text; open the pinch to resume pointing."
+        physical_right="Left" if self.config.camera_mirrored else "Right"
+        owner="RIGHT" if self.voice_hand==physical_right else "LEFT"
+        return f"Wispr listening — relax or lower your hand. {owner} index + pinky + thumb (swag sign) stops and inserts text."
 
     def set_enabled(self,value):
         self.controller.enabled=False;self.interrupt();self.controller.set_enabled(value)
         self.paused=False;self.chosen_label=None
         self.chosen_since=None;self.hand_role_locked=False
+        self.swipe_quiet_until=0
 
     def toggle_pause(self):
         self.interrupt();self.paused=not self.paused
@@ -81,8 +108,10 @@ class TouchpadSession:
         if not self.controller.enabled:return "Touchpad off."
         if self.last_submode!=self.config.touchpad_submode:
             self.interrupt();self.last_submode=self.config.touchpad_submode
+        if self.dictating:
+            return self.process_dictation(hands if age<=.2 else (),t,aspect)
         if age>.2:
-            self.interrupt();return "Camera tracking stale — input released and dictation cancelled."
+            return self.tracking_stale()
         if self.config.touchpad_submode=="desktop" and self.config.touchpad_swipe_enabled:
             # The new next recording contains a low-confidence duplicate hand
             # during motion blur. It is not an established second hand role.
@@ -95,6 +124,7 @@ class TouchpadSession:
         both_open=self.config.touchpad_submode!="gaming" and open_palm(self.primary,aspect) and open_palm(self.helper,aspect)
         if self.pause_pose.update(both_open,t):return self.toggle_pause()
         if both_open:
+            self.voice_pose.reset();self.voice_candidate=None
             self.release_inputs();return "Hold both open palms steadily to pause/resume."
         if self.paused:return "PAUSED — press Ctrl+Alt+M to resume." if self.config.touchpad_submode=="gaming" else "PAUSED — hold both open palms for one second, or press Ctrl+Alt+M."
         if self.config.touchpad_submode=="gaming":
@@ -110,37 +140,42 @@ class TouchpadSession:
         if self.config.touchpad_submode=="drawing":
             self.drawing.config=self.config;self.drawing.sink=self.controller.sink
             return self.drawing.process(self.primary,t,age,aspect,click_hand=self.helper,split_click=self.config.drawing_two_hand)
-        pose=victory(self.helper,aspect) or victory(self.primary,aspect)
-        if not self.config.wispr_enabled:pose=False
-        # A natural control-hand stroke can briefly resemble a V as tracking
-        # changes finger counts. Its reserved sideways pose wins that transient
-        # estimate; a deliberate helper V and active dictation retain priority.
-        if not self.dictating and not (self.config.wispr_enabled and victory(self.helper,aspect)):
+        voice_hand=next((h for h in (self.helper,self.primary) if h is not None
+                         and h.handedness_confidence>=.65 and voice_symbol(h,aspect)=="start"),None) if self.config.wispr_enabled else None
+        pose=voice_hand is not None
+        if pose and self.voice_candidate!=voice_hand.label:
+            self.voice_pose.reset();self.voice_candidate=voice_hand.label
+        if not pose:self.voice_candidate=None
+        # Only the physical right hand supplies window swipes. Mirroring
+        # changes the tracker's handedness label, not the physical hand role.
+        right="Left" if self.config.camera_mirrored else "Right"
+        swipe_control=next((h for h in hands if h.label==right),None)
+        # A deliberate rock sign takes priority over a pending window swipe.
+        if pose:
+            self.swipe.reset()
+        else:
             if self.config.touchpad_swipe_enabled and self.window_switcher:
-                freeze,direction=self.swipe.update(self.primary,t,self.config,aspect,
+                freeze,direction=self.swipe.update(swipe_control,t,self.config,aspect,
                     blocked=self.controller.button_held is not None or self.controller.dragging or t<self.controller.release_until,age=age)
                 if freeze:
-                    self.voice_pose.reset();self.controller.interrupt()
+                    if self.swipe.moving or direction is not None:self.swipe_quiet_until=t+.2
+                    self.voice_pose.reset();self.voice_candidate=None
+                    if self.swipe.moving or direction is not None or t<self.swipe_quiet_until:self.controller.interrupt()
+                    else:self.controller.observe_open(self.primary,t,aspect)
                     if direction is not None:return self.window_switcher.switch(direction)
-                    return "Air swipe ready — sweep your relaxed hand sideways. No open palm needed."
+                    return self.swipe.hint
             else:self.swipe.reset()
         requested=self.voice_pose.update(pose,t)
         if requested and not self.dictating and self.shortcuts:
             self.controller.interrupt()
             self.shortcuts.begin(self.config.wispr_shortcut_mode)
-            self.voice_started=t;self.voice_end_since=None
+            self.voice_started=t;self.voice_hand=voice_hand.label;self.voice_stop.reset()
         if self.dictating:
-            self.swipe.reset()
-            self.controller.interrupt() # Keep the selected textbox/cursor stable.
-            if not self.shortcuts.target_unchanged():
-                self.interrupt();return "Dictation cancelled because the focused textbox/window changed."
-            if pose:self.voice_end_since=None
-            elif self.voice_end_since is None:self.voice_end_since=t
-            if self.voice_end_since is not None and t-self.voice_end_since>=.45 and t-self.voice_started>=1:
-                self.shortcuts.finish();self.voice_started=None;self.voice_end_since=None
-                return "Wispr stop shortcut sent — wait for Flow to insert text; open pinches to resume pointing."
-            return "Wispr gesture active — speak after Flow's ping; lower the V gesture to finish."
+            return self.process_dictation(hands,t,aspect)
         if pose:
             self.swipe.reset()
-            self.controller.interrupt();return "Hold the V gesture steadily to start Wispr."
+            self.controller.interrupt();return "Rock sign detected — starting Wispr. Relax, then add your thumb to the same-hand rock sign to finish."
+        if self.config.touchpad_swipe_enabled and t<self.swipe_quiet_until:
+            self.controller.interrupt()
+            return "Swipe settling — relax your hand, then point or pinch normally."
         return self.controller.process(self.primary,t,age,aspect,precision=open_palm(self.helper,aspect))

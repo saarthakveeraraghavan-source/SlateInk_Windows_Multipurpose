@@ -10,7 +10,7 @@ from slateink.window_switching import WindowCycle, WindowsWindowBackend
 from slateink.injection import INPUT, InjectionError
 from slateink.mouse_control import HandMouseController
 from slateink.touchpad_session import TouchpadSession
-from test_touchpad_product import pose, Shortcuts
+from test_touchpad_product import pose, rock_pose, Shortcuts
 from test_mouse_control import hand
 from test_touchpad_submodes import Keys, Pixels
 from test_air_swipe import air_pose
@@ -69,8 +69,8 @@ def session(config=None):
 
 
 def session_sweep(ses,start=1.3,helper=None):
-    for i in range(20):
-        progress=max(0,min(1,(i-6)/8))
+    for i in range(26):
+        progress=max(0,min(1,(i-9)/8))
         hands=(air_pose(progress,mirrored=ses.config.camera_mirrored),)
         if helper is not None:hands+=(helper,)
         ses.process(hands,start+i*.05,aspect=16/9)
@@ -108,9 +108,9 @@ def test_two_palm_pause_and_helper_precision_take_priority():
 
 def test_wispr_blocks_swipe_and_clears_candidate():
     ses,_,switcher,flow= session(Config(wispr_enabled=True))
-    for i in range(30):ses.process((pose(label="Right"),pose(spread=True,label="Left")),1.3+i*.033)
+    for i in range(30):ses.process((pose(label="Right"),rock_pose(label="Left")),1.3+i*.033)
     assert ses.dictating
-    session_sweep(ses,start=2.4,helper=pose(spread=True,label="Left"))
+    session_sweep(ses,start=2.4,helper=rock_pose(label="Left"))
     assert not switcher.events and not ses.swipe.armed
 
 

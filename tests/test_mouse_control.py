@@ -116,8 +116,10 @@ def test_left_pinch_holds_drag_and_release_finishes_once():
 def test_middle_pinch_right_click_without_left_press():
     c,s=controller();arm(c)
     c.process(hand(right=0.2),1.14);c.process(hand(right=0.2),1.22)
+    assert not s.held # right click deliberately needs longer confirmation
+    c.process(hand(right=0.2),1.26)
     assert s.held=={"right"}
-    c.process(hand(),1.25);c.process(hand(),1.33)
+    c.process(hand(),1.29);c.process(hand(),1.37)
     assert not s.held and ("left",True) not in s.events
 
 
@@ -128,7 +130,95 @@ def test_joined_fingers_allow_a_clearly_closer_thumb_target(button):
     p=list(h.landmarks);p[14]=(.6,.52,0);p[16]=(.6,.3,0)
     h=Hand(tuple(p),h.ratio,h.label)
     c.process(h,1.14);c.process(h,1.22)
+    c.process(h,1.26)
     assert s.held=={button}
+
+
+def test_left_click_arms_without_requiring_middle_pinch_to_open_fully():
+    c,s=controller()
+    c.process(hand(right=.5),1);c.process(hand(right=.5),1.1)
+    assert c.left.released and not c.right.released
+    c.process(hand(left=.2,right=.5),1.14);c.process(hand(left=.2,right=.5),1.22)
+    assert s.held=={"left"}
+    c.process(hand(right=.5),1.26);c.process(hand(right=.5),1.34)
+    assert s.events==[("left",True),("left",False)]
+
+
+def test_folded_index_with_straight_middle_resolves_joined_left_pinch():
+    c,s=controller();arm(c)
+    p=list(hand().landmarks)
+    p[0]=(.5,.8,0);p[6]=(.48,.55,0);p[8]=(.48,.58,0)
+    p[10]=(.52,.6,0);p[12]=(.52,.5,0);p[4]=(.49,.55,0)
+    from slateink.gestures import pinch_ratio
+    h=Hand(tuple(p),pinch_ratio(p),"Left")
+    c.process(h,1.14);c.process(h,1.22)
+    assert s.held=={"left"} and ("right",True) not in s.events
+
+
+def test_brief_middle_pinch_flicker_does_not_right_click():
+    c,s=controller();arm(c)
+    c.process(hand(right=.2),1.14);c.process(hand(right=.2),1.22)
+    c.process(hand(),1.24);c.process(hand(),1.32)
+    assert not s.events and not s.held
+
+
+def test_right_click_cannot_start_with_an_unarmed_index_pinch():
+    c,s=controller()
+    c.process(hand(left=.5),1);c.process(hand(left=.5),1.1)
+    assert c.right.released and not c.left.released
+    for t in (1.14,1.2,1.26):c.process(hand(left=.5,right=.2),t)
+    for t in (1.3,1.38):c.process(hand(right=.2),t)
+    assert not s.events and not s.held
+
+
+def test_middle_just_closer_than_index_is_not_a_clear_right_click():
+    c,s=controller();arm(c)
+    for i in range(8):c.process(hand(left=.4,right=.3),1.14+i*.05)
+    assert not s.events and not s.held
+
+
+def test_swipe_speed_palm_travel_during_pinch_cannot_become_right_click():
+    c,s=controller();arm(c)
+    c.process(hand(right=.2),1.14)
+    c.process(hand(right=.2,x=.57),1.26)
+    assert not s.events and not s.held
+
+
+def test_two_left_pinches_still_deliver_two_clicks_without_right_click():
+    c,s=controller();arm(c)
+    for start in (1.14,1.4):
+        c.process(hand(left=.2),start);c.process(hand(left=.2),start+.08)
+        c.process(hand(),start+.12);c.process(hand(),start+.2)
+    assert s.events==[("left",True),("left",False)]*2
+
+
+@pytest.mark.parametrize("fps",[15,24,30,60])
+def test_short_index_pinch_is_not_lost_at_normal_camera_rates(fps):
+    c,s=controller();dt=1/fps
+    for i in range(round(.3*fps)+1):c.process(hand(),1+i*dt)
+    for i in range(max(2,round(.1*fps))):c.process(hand(left=.2),1.4+i*dt)
+    for i in range(round(.3*fps)+1):c.process(hand(),1.6+i*dt)
+    assert s.events==[("left",True),("left",False)]
+
+
+def test_left_contact_hysteresis_tolerates_threshold_jitter_but_not_a_single_frame():
+    c,s=controller();arm(c)
+    c.process(hand(left=.2),1.14);c.process(hand(),1.173)
+    assert not s.events
+    for t,ratio in ((1.21,.3),(1.243,.38),(1.276,.32),(1.31,.4)):
+        c.process(hand(left=ratio),t)
+    assert s.held=={"left"} and ("right",True) not in s.events
+
+
+def test_natural_index_pinch_can_keep_other_fingers_curled_without_clicking_a_fist():
+    from test_touchpad_product import pose
+    from slateink.gestures import pinch_ratio
+    c,s=controller();arm(c)
+    p=list(pose((False,)*4).landmarks)
+    p[4]=(.42,.58,0);p[8]=(.45,.58,0)
+    h=Hand(tuple(p),pinch_ratio(p),"Left")
+    for t in (1.14,1.18,1.22):c.process(h,t)
+    assert s.held=={"left"}
 
 
 def test_drag_cannot_switch_to_right_button_without_rearm():

@@ -1,4 +1,4 @@
-"""Reference recordings -> real local tracker -> full Desktop gesture routing.
+"""Current named right-hand recordings -> tracker -> full Desktop routing.
 
 No live camera or desktop input: mouse and window sinks only record requests.
 """
@@ -44,15 +44,15 @@ def replay(data):
         before=len(windows.events)
         session.process(hands,row["t"]+1,aspect=data["aspect"])
         if len(windows.events)>before:observed.append({"time_seconds":round(row["t"],3),"direction":windows.events[-1]})
-    expected=1 if data["video"].startswith("Next") else -1
     return {"video":data["video"],"mirrored":data["mirrored"],"events":observed,
             "unwanted_mouse_events":mouse.events,"buttons_released":not mouse.held,
-            "success":windows.events==[expected] and not mouse.events and not mouse.held}
+            "sha256":data["sha256"],
+            "success":windows.events==[1 if data["video"].startswith("Next") else -1] and not mouse.events and not mouse.held}
 
 
 def main():
-    analyze()
-    directory=ROOT/"artifacts/natural-swipe-references"
+    directory=ROOT/"artifacts/right-hand-swipe-20261015"
+    analyze(out=directory)
     results=[replay(json.loads(path.read_text())) for path in sorted(directory.glob("*-raw.json"))+sorted(directory.glob("*-mirrored.json"))]
     report={"success":all(r["success"] for r in results),"live_camera_opened":False,
             "desktop_input_sent":False,"real_local_hand_tracker_used":True,"clips":results}

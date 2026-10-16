@@ -14,6 +14,9 @@ class Config:
     camera_exposure: int | None = -5
     camera_mirrored: bool = True
     camera_rotation: int = 0
+    camera_preview_enabled: bool = False
+    camera_preview_x: int | None = None
+    camera_preview_y: int | None = None
     initial_mode: str = "paper"
     canvas_width: int = 600
     canvas_height: int = 600
@@ -58,6 +61,10 @@ class Config:
             raise ValueError("Windows exposure must be null or between -13 and 0.")
         if type(self.camera_mirrored) is not bool or self.camera_rotation not in {0,90,180,270}:
             raise ValueError("Invalid camera mirror/rotation settings.")
+        if type(self.camera_preview_enabled) is not bool:raise ValueError("Floating camera preview must be true or false.")
+        position=(self.camera_preview_x,self.camera_preview_y)
+        if any(v is None for v in position) and not all(v is None for v in position):raise ValueError("Preview position needs both coordinates.")
+        if any(v is not None and (type(v) is not int or not -100000<=v<=100000) for v in position):raise ValueError("Invalid floating preview position.")
         if self.initial_mode not in {"paper","hand_mouse","pen_pointer","finger_letters","eye_gaze"}:
             raise ValueError("Invalid initial mode.")
         if not (0.2<=self.touchpad_sensitivity<=3 and 0.001<=self.touchpad_deadzone<=0.02):

@@ -6,6 +6,9 @@
   "camera_exposure": -5,
   "camera_mirrored": true,
   "camera_rotation": 0,
+  "camera_preview_enabled": false,
+  "camera_preview_x": null,
+  "camera_preview_y": null,
   "initial_mode": "paper",
   "canvas_width": 600,
   "canvas_height": 600,
@@ -23,6 +26,9 @@
   "gaze_allow_unverified": false,
   "touchpad_hand": "auto",
   "touchpad_submode": "desktop",
+  "touchpad_swipe_enabled": true,
+  "touchpad_swipe_sensitivity": 1.0,
+  "touchpad_swipe_cooldown": 0.8,
   "drawing_sensitivity": 1.6,
   "gaming_radius": 0.22,
   "gaming_hud": true,
@@ -32,8 +38,5 @@
   "touchpad_drag_threshold": 0.012,
   "touchpad_background": true,
   "wispr_enabled": false,
-  "wispr_shortcut_mode": "toggle_ctrl_win",
-  "touchpad_swipe_enabled": true,
-  "touchpad_swipe_sensitivity": 1.0,
-  "touchpad_swipe_cooldown": 0.8
+  "wispr_shortcut_mode": "toggle_ctrl_win"
 }

@@ -10,67 +10,7 @@ from .config import ROOT
 from .orientation import orient_frame
 
 
-class CameraSource(threading.Thread):
-    def __init__(self, config):
-        super().__init__(name="visible-camera", daemon=True)
-        self.config = config
-        self.stop_event = threading.Event()
-        self.lock = threading.Lock()
-        self.latest = None
-        self.error = None
-        self.times = deque(maxlen=90)
-        self.sequence = 0
-        self.opened = False
-        self.resolution = None
-
-    def run(self):
-        backend = cv2.CAP_DSHOW if __import__("sys").platform == "win32" else cv2.CAP_ANY
-        camera = cv2.VideoCapture(self.config.camera_index, backend)
-        original_exposure = None
-        try:
-            if not camera.isOpened():
-                raise RuntimeError("Cannot open webcam. Close other camera apps and check Windows camera permission.")
-            camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-            camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.camera_width)
-            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.camera_height)
-            camera.set(cv2.CAP_PROP_FPS, self.config.camera_fps)
-            if __import__("sys").platform == "win32" and self.config.camera_exposure is not None:
-                original_exposure = camera.get(cv2.CAP_PROP_EXPOSURE)
-                if not camera.set(cv2.CAP_PROP_EXPOSURE, self.config.camera_exposure):
-                    raise RuntimeError("Camera rejected the configured exposure. Set camera_exposure to null to use the camera default.")
-            self.opened = True
-            failures = 0
-            while not self.stop_event.is_set():
-                ok, frame = camera.read()
-                if not ok:
-                    failures += 1
-                    if failures >= 5:
-                        raise RuntimeError("Webcam stopped delivering frames. Capture has been disabled.")
-                    time.sleep(0.03)
-                    continue
-                failures = 0
-                t = time.monotonic()
-                self.resolution = (frame.shape[1], frame.shape[0])
-                with self.lock:
-                    self.times.append(t)
-                    self.sequence += 1
-                    self.latest = (self.sequence, t, frame)
-        except Exception as exc:
-            self.error = str(exc)
-        finally:
-            if original_exposure is not None:
-                camera.set(cv2.CAP_PROP_EXPOSURE, original_exposure)
-            camera.release()
-            self.opened = False
-            with self.lock:
-                self.latest = None
-
-    def get(self, last_sequence):
-        with self.lock:
-            if self.latest is None or self.latest[0] == last_sequence:
-                return None
-            fps = ((len(self.times)-1)/(self.times[-1]-self.times[0])) if len(self.times) > 1 else 0
-            return (*self.latest, fps)
+from .camera_source import CameraSource
 
 
 @dataclass

@@ -55,6 +55,7 @@ class ModesMixin:
         self.sensitivity.setValue(self.config.touchpad_sensitivity);self.sensitivity.setPrefix("Speed × ");row.addWidget(self.sensitivity)
         self.sensitivity.valueChanged.connect(self.set_touchpad_speed)
         self.right_click=QCheckBox("Middle + thumb: right click"); self.right_click.setChecked(True); row.addWidget(self.right_click)
+        self.right_click.setToolTip("Pinch thumb + middle clearly, with the index pinch open; hold briefly (about 0.1 seconds), then release. A brief passing touch or fast hand sweep does not right-click.")
         self.unverified_gaze=QCheckBox("Allow unverified gaze");self.unverified_gaze.setChecked(self.config.gaze_allow_unverified)
         self.unverified_gaze.setToolTip("Enable after the nine-dot mapping even if accuracy checks fail. Pointing may be inaccurate.")
         self.unverified_gaze.toggled.connect(self.set_unverified_gaze);row.addWidget(self.unverified_gaze)
@@ -78,13 +79,14 @@ class ModesMixin:
         sub.addStretch();layout.addWidget(self.submode_panel)
         self.swipe_panel=QWidget();swipes=QHBoxLayout(self.swipe_panel);swipes.setContentsMargins(0,0,0,0)
         self.swipe_enabled=QCheckBox("Enable window swipes");self.swipe_enabled.setChecked(self.config.touchpad_swipe_enabled);swipes.addWidget(self.swipe_enabled)
-        self.swipe_enabled.setToolTip("Uncheck to disable next/previous air swipes. You can change this while using the mouse; your choice is saved.")
+        self.swipe_enabled.setToolTip("Use your right hand: open the fingers and sweep as shown in your Next/Previous videos. Mirroring is corrected automatically. No fist hold or pointing-pose unlock. Uncheck anytime to disable; your choice is saved.")
         self.swipe_sensitivity=QDoubleSpinBox();self.swipe_sensitivity.setRange(.5,2);self.swipe_sensitivity.setSingleStep(.1);self.swipe_sensitivity.setValue(self.config.touchpad_swipe_sensitivity);self.swipe_sensitivity.setPrefix("Swipe sensitivity × ");swipes.addWidget(self.swipe_sensitivity)
-        self.swipe_sensitivity.setToolTip("Higher sensitivity needs less sideways hand travel. Use the relaxed-hand strokes in your latest Next and Previous videos; no open palm is required.")
+        self.swipe_sensitivity.setToolTip("Higher sensitivity needs less whole-hand travel, with a minimum floor. Use the open right-hand sweeps in your Next/Previous videos. Pointing fingers, three-finger scrolling and finger-only movement do not start swipes.")
         self.swipe_cooldown=QDoubleSpinBox();self.swipe_cooldown.setRange(.4,3);self.swipe_cooldown.setSingleStep(.1);self.swipe_cooldown.setValue(self.config.touchpad_swipe_cooldown);self.swipe_cooldown.setPrefix("Swipe cooldown ");self.swipe_cooldown.setSuffix(" s");swipes.addWidget(self.swipe_cooldown)
         swipes.addStretch();layout.addWidget(self.swipe_panel)
         self.wispr_panel=QWidget();flow=QHBoxLayout(self.wispr_panel);flow.setContentsMargins(0,0,0,0)
-        self.wispr_enabled=QCheckBox("V gesture → Wispr Flow");self.wispr_enabled.setChecked(self.config.wispr_enabled);flow.addWidget(self.wispr_enabled)
+        self.wispr_enabled=QCheckBox("Rock starts / swag stops Wispr");self.wispr_enabled.setChecked(self.config.wispr_enabled);flow.addWidget(self.wispr_enabled)
+        self.wispr_enabled.setToolTip("Start: index + pinky raised, middle/ring folded, thumb tucked. Relax or remove your hand while talking. Stop: index + pinky + thumb extended with that SAME hand. Desktop only. Escape cancels.")
         self.wispr_mode=QComboBox();self.wispr_mode.addItems(["Ctrl+Win: press to start/stop","Ctrl+Win: hold to talk","Ctrl+Win+Space: start/stop"])
         self.wispr_mode.setCurrentIndex(("toggle_ctrl_win","hold_ctrl_win","toggle_ctrl_win_space").index(self.config.wispr_shortcut_mode));flow.addWidget(self.wispr_mode)
         self.guide_button=self.button("Open gesture guide",self.open_touchpad_guide);flow.addWidget(self.guide_button);flow.addStretch();layout.addWidget(self.wispr_panel)
@@ -150,7 +152,8 @@ class ModesMixin:
             self.tray.setContextMenu(menu);self.tray.activated.connect(lambda reason:self.showNormal() if reason==QSystemTrayIcon.ActivationReason.DoubleClick else None)
 
     def can_background_touchpad(self):
-        return self.mode=="hand_mouse" and self.config.touchpad_background and self.tray is not None and self.hand_mouse is not None and self.hand_mouse.enabled
+        indicator=self.tray is not None or self.can_background_camera_preview()
+        return self.mode=="hand_mouse" and self.config.touchpad_background and indicator and self.hand_mouse is not None and self.hand_mouse.enabled
 
     def toggle_touchpad(self):
         if self.state in {State.PROCESSING,State.TYPING}:return
@@ -193,7 +196,7 @@ class ModesMixin:
         self.unverified_gaze.setVisible(gaze);self.unverified_gaze.setEnabled(not busy and not stopping and self.gaze_dialog is None)
         self.pointer_button.setVisible(hand or pen or gaze)
         active=mouse_active or gaze_active or self.pen_pointer_enabled or self.pointer_deadline is not None
-        if hand and mouse_active and self.touchpad_session:self.status_label.setText("HAND TOUCHPAD PAUSED" if self.touchpad_session.paused else ("WISPR GESTURE ACTIVE" if self.touchpad_session.dictating else "HAND TOUCHPAD ACTIVE"))
+        if hand and mouse_active and self.touchpad_session:self.status_label.setText("HAND TOUCHPAD PAUSED" if self.touchpad_session.paused else ("WISPR LISTENING" if self.touchpad_session.dictating else "HAND TOUCHPAD ACTIVE"))
         if hand and mouse_active and not self.touchpad_session.paused and not desktop:self.status_label.setText("GAMING ACTIVE" if gaming else "DRAWING ACTIVE")
         if gaming and mouse_active and self.config.gaming_hud:
             if self.game_hud is None:
@@ -228,7 +231,7 @@ class ModesMixin:
         self.calibrate_button.setText("Calibrate eyes & check accuracy" if gaze else ("Select writing area" if paper else ("Calibrate pointer area" if pen else "Calibrate slate")))
         messages={
             "paper":"Write with real ink on paper or a visible slate. Select the writing area; remove your hand/pen, capture it, review the text, then explicitly send it. Camera images stay local.",
-            "hand_mouse":"Joined index + middle: point. Three fingers: scroll. Index pinch: click/select/drag; two pinches: double-click. Middle pinch: right-click. Natural sideways air swipe with relaxed fingers: next/previous as in your latest videos; no open palm needed. Helper open palm: precision; both open palms: pause/resume. Hold a V for Wispr, lower it to finish. Escape stops everything.",
+            "hand_mouse":"Joined index + middle: point. Three fingers: scroll. Index pinch: click/select/drag; two pinches: double-click. Middle pinch: right-click. Windows: open your RIGHT hand and sweep as in Next/Previous videos; mirror correction is automatic. Relax fingers to point again. Helper open palm: precision; both open palms: pause/resume. Wispr: index + pinky (rock sign, thumb tucked) starts; relax while talking, then index + pinky + thumb (swag sign) with the SAME hand finishes. Escape stops everything.",
             "eye_gaze":"Local eye control: calibrate the nine-dot screen mapping. Allow unverified gaze lets you enable desktop control even if accuracy checks fail; pointing may be inaccurate. Look to point, index pinch left-clicks, middle pinch right-clicks. Escape stops and releases buttons.",
             "pen_pointer":"Experimental hover tracking requires a bright colored marker near the pen tip. Webcam-only touch/hover is not verified: this mode moves the cursor and NEVER clicks.",
             "finger_letters":"Experimental: reported inaccurate on your handwriting. Letter capture is retained for testing; use paper/slate OCR for actual ink."}

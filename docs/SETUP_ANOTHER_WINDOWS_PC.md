@@ -9,8 +9,7 @@ Linux/macOS desktop input is not implemented in this release.
 ## 1. Download the source
 
 1. Open [SlateInk_Windows_Multipurpose](https://github.com/saarthakveeraraghavan-source/SlateInk_Windows_Multipurpose).
-   This repository is currently private: sign in with an account that the owner
-   has given access. A person without access cannot download it.
+   This repository is public; anyone can download its source ZIP without signing in.
 2. Choose **Code → Download ZIP**, then **Extract all** in Windows File Explorer.
 3. Put the extracted folder somewhere writable, such as Documents. Open the
    folder containing `README.md`, `run.cmd`, `slateink` and `requirements-lock.txt`.
@@ -107,16 +106,28 @@ air-swipe controls. You can also select Hand touchpad for one launch with:
    and briefly open thumb/index and thumb/middle pinches to arm mouse input.
 3. Join upright index + middle to point; index/thumb pinches click and drag;
    three extended fingers scroll. See the [gesture guide](GESTURE_GUIDE.md).
-4. Try natural sideways air strokes with relaxed fingers for next/previous windows.
-   No open palm or deliberate wrist-turn pose is needed.
+4. Show your open RIGHT hand and sweep as shown in the new named Next/Previous
+   recordings. Next sweeps across your chest toward your left; Previous reverses
+   toward your right. Mirror correction is automatic. No fist hold or unlock
+   pose is required. Relax the fingers to return to pointing.
 5. To disable this feature, **uncheck Enable window swipes**. This works while
    controls are active, cancels pending recognition and keeps mouse controls on.
    Recheck to enable it. Your choice persists for later launches.
 
 **Escape** stops capture and releases owned input. **Ctrl+Alt+M** starts/pauses/
 resumes hand touchpad while SlateInk runs. Enabled hand touchpad can keep running
-when minimized if its visible tray indicator is available; use **Stop & quit**
-or the tray Quit action to close it completely.
+when minimized with its saved background option and a visible tray/preview
+indicator; use the main ×, **Stop & quit** or tray Quit to close it completely.
+
+In every mode, check **Floating camera preview** beside the camera controls to
+keep the feed above other windows. Drag its header; the position is saved. Its ×
+hides that preview. In non-touchpad modes an explicitly enabled preview can keep
+camera-only capture while input stops on minimize. Exclusive-fullscreen games
+are not validated; try windowed/borderless mode for the desktop preview.
+
+Only one session runs per installation. Opening the shortcut again shows the
+existing window. Closing the main app waits for the isolated camera owner to
+exit, including bounded cleanup of a stalled driver read.
 
 ## 6. Preferences for this computer
 
@@ -139,16 +150,19 @@ this file. Keep it valid JSON: no comments or trailing commas. Other defaults
 remain in `config.json`. Choose CPU for OCR if GPU initialization is unavailable.
 Hand touchpad does not require a writing-area or eye calibration.
 
-Wispr Flow is optional and installed/configured separately. Its V gesture starts
+Wispr Flow is optional and installed/configured separately. Its voice gesture starts
 disabled in the portable repository. Enable it only with a matching installed
 Wispr shortcut; SlateInk sends start/stop requests and does not transcribe audio.
+In Desktop, show index + pinky with the thumb tucked (rock sign) to start.
+Relax or remove your hand while talking, then extend index + pinky + thumb
+(swag sign) with that same hand to stop and insert text. V and thumbs-up are inactive.
 Eye gaze remains experimental and requires new calibration on each computer.
 
 ## 7. Update an existing installation
 
 If you are already using this working local project, restart SlateInk to load
 updated source files; do not reinstall your environment or replace your settings
-just for the new swipe checkbox.
+to load a gesture update.
 
 For an older Download ZIP installation:
 
@@ -178,6 +192,7 @@ edits, rerun the pinned dependency installation if its file changed, then restar
 | Webcam cannot open | Close other camera apps, enable Windows camera access for desktop apps, and try another `camera_index`. |
 | Dark image or rejected exposure setting | Set `camera_exposure` to `null` in `config.local.json`, then restart capture. |
 | GPU error during paper OCR | Select **CPU**; hand tracking itself does not need CUDA. |
+| Camera LED stays on after quitting | Quit any older SlateInk copies and other camera apps. The updated build closes its camera owner; see `docs/FLOATING_CAMERA_VALIDATION.md` for checks. |
 | No window switches | Check Desktop mode, enabled controls and **Enable window swipes**; keep the hand visible and release keyboard modifiers/held buttons. |
 | Swipes feel too sensitive | Disable controls to reduce Swipe sensitivity or increase its cooldown, or uncheck Enable window swipes. |
 
@@ -189,8 +204,7 @@ Optional software verification, after dependencies are installed:
 
 Run that command while SlateInk is closed. Optional model/public-image checks
 can skip when their separate assets are absent. Portable swipe tests use bundled
-independently generated synthetic hand fixtures; personal recordings and their
-extracted observations are not included.
+synthetic fixtures. Personal reference videos/observations are local-only assets.
 Native diagnostic probes send real input to disposable windows and are separate
 from ordinary installation.
 

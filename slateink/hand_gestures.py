@@ -26,10 +26,39 @@ def open_palm(hand,aspect=4/3):
     return hand is not None and all(fingers(hand,aspect)) and hand.ratio is not None and hand.ratio>.6
 
 
-def victory(hand,aspect=4/3):
-    if hand is None:return False
-    extended=fingers(hand,aspect);palm=distance(hand,5,17,aspect)
-    return extended==(True,True,False,False) and palm>.025 and distance(hand,8,12,aspect)/palm>.7 and hand.ratio is not None and hand.ratio>.55
+def voice_symbol(hand,aspect=4/3):
+    """Rock starts; index/pinky/thumb spread stops. Ambiguous thumbs do neither.
+
+    Thumb spread is measured along the palm's own axis, so mirroring or turning
+    the hand does not reverse the meanings. Only the index and pinky extend;
+    the middle/ring fingers remain folded in both symbols.
+    """
+    if not visible_control(hand) or fingers(hand,aspect)!=(True,False,False,True):return None
+    p=hand.landmarks;palm=distance(hand,5,17,aspect)
+    if palm<.025 or any(not all(isfinite(v) for v in p[i][:2]) for i in (2,3)):return None
+    axis=((p[5][0]-p[17][0])*aspect,p[5][1]-p[17][1])
+    tip=((p[4][0]-p[5][0])*aspect,p[4][1]-p[5][1])
+    outward=sum(a*b for a,b in zip(axis,tip))/(palm*palm)
+    extended=(outward>=.18 and distance(hand,4,2,aspect)>=palm*.45
+              and distance(hand,4,2,aspect)>distance(hand,3,2,aspect)*1.5)
+    folded=outward<=.02 and distance(hand,4,9,aspect)<=palm*.7
+    if extended:return "stop"
+    if folded:return "start"
+    return None
+
+
+class ConfirmedPose:
+    """Fast two-observation confirmation; no startup neutral pose or long hold."""
+    def __init__(self,hold=.025):self.hold=hold;self.reset()
+    def reset(self):self.since=None;self.last=None;self.fired=False
+    def update(self,active,t):
+        if not active:self.reset();return False
+        if self.last is None or not 0<t-self.last<=.2:
+            self.reset();self.since=t
+        self.last=t
+        if not self.fired and t-self.since>=self.hold:
+            self.fired=True;return True
+        return False
 
 
 def scroll_pose(hand,aspect=4/3):

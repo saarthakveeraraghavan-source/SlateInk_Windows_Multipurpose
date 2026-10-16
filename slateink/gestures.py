@@ -3,9 +3,12 @@ from math import hypot, isfinite
 
 class Pinch:
     """Hysteresis, time debounce, and release-to-arm after every interruption."""
-    def __init__(self, down=0.35, up=0.55, debounce_ms=60):
+    def __init__(self, down=0.35, up=0.55, debounce_ms=60, press_debounce_ms=None, latch_press=False):
         self.down_threshold, self.up_threshold = down, up
         self.debounce = debounce_ms / 1000
+        self.press_debounce = max(0,(press_debounce_ms if press_debounce_ms is not None else debounce_ms)/1000)
+        self.latch_press = latch_press
+        if not latch_press:self.press_debounce=max(self.debounce,self.press_debounce)
         self.reset()
 
     def reset(self):
@@ -27,12 +30,13 @@ class Pinch:
             else:
                 self.candidate = None
             return False
-        wanted = ratio < self.down_threshold if not self.down else ratio < self.up_threshold
+        closing = self.down or (self.latch_press and self.candidate is True)
+        wanted = ratio < (self.up_threshold if closing else self.down_threshold)
         if wanted == self.down:
             self.candidate = None
         elif self.candidate != wanted:
             self.candidate, self.since = wanted, t
-        elif t - self.since >= self.debounce:
+        elif t - self.since >= (self.press_debounce if wanted else self.debounce):
             self.down, self.candidate = wanted, None
         return self.down
 

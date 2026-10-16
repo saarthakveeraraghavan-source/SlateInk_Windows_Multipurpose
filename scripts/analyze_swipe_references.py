@@ -15,11 +15,15 @@ from slateink.hand_gestures import fingers,open_palm,distance
 from slateink.mouse_control import middle_pinch_ratio
 
 
-def analyze():
-    out=ROOT/"artifacts/natural-swipe-references";out.mkdir(exist_ok=True)
-    for filename in ("Next_Swipe-Gesture.mp4","Previous_Swipe-Gesture.mp4"):
+def analyze(filenames=None,out=None):
+    filenames=filenames or ("Next_Swipe-Gesture (2).mp4","Previous_Swipe-Gesture (2).mp4")
+    out=Path(out) if out else ROOT/"artifacts/right-hand-swipe-20261015"
+    out.mkdir(parents=True,exist_ok=True)
+    for filename in filenames:
+        if not (ROOT/filename).is_file():raise FileNotFoundError(filename)
         for mirrored in (False,True):
             capture=cv2.VideoCapture(str(ROOT/filename));fps=capture.get(cv2.CAP_PROP_FPS)
+            if not capture.isOpened() or fps<=0:raise ValueError("Cannot decode reference video: "+filename)
             tracker=HandTracker(ROOT/"models/hand_landmarker.task");rows=[];i=0
             try:
                 while True:

@@ -15,7 +15,7 @@ Physical accuracy and long-session reliability remain experimental.
 | Eye gaze + pinch | Experimental nine-target eye calibration and five-target accuracy check, followed by gaze pointing and pinch clicks |
 | Pen hover pointer | Experimental colored-marker tracking for pointer movement; pen contact does not infer a click |
 | Finger letters | Experimental one-letter-at-a-time virtual handwriting, local recognition, review and explicit acceptance |
-| Optional Wispr Flow shortcut | V gesture requests dictation start/stop through a matching installed Wispr shortcut; disabled by default |
+| Optional Wispr Flow shortcut | Rock sign (index + pinky, thumb tucked) starts; swag sign (index + pinky + thumb) with the same hand stops dictation through a matching installed Wispr shortcut; disabled by default |
 
 See the [gesture guide](docs/GESTURE_GUIDE.md) or its [HTML version](docs/GESTURE_GUIDE.html)
 for Desktop, Gaming, Drawing, background use, scrolling, shortcuts and pause/stop gestures.
@@ -24,8 +24,8 @@ for Desktop, Gaming, Drawing, background use, scrolling, shortcuts and pause/sto
 
 Start with the [installation and update guide](docs/SETUP_ANOTHER_WINDOWS_PC.md).
 It explains Download ZIP, Python 3.12 x64, dependencies, models, first use,
-updates, saved preferences and troubleshooting. The repository is currently
-private; installers need an account that the owner has given access.
+updates, saved preferences and troubleshooting. This public repository can be
+downloaded without signing in.
 
 **Installing on another computer?** Follow the [step-by-step Windows setup guide](docs/SETUP_ANOTHER_WINDOWS_PC.md), including camera, CPU/GPU, mode, Wispr and calibration settings.
 
@@ -55,14 +55,28 @@ hover, then folding only the middle finger begins index drawing.
 
 ## Configuration
 
+### Latest camera and Wispr controls
+
+- **Floating camera preview:** optional small feed above desktop windows in all
+  modes. Drag its header to place it; position and on/off choice save locally.
+- **Close / minimize:** closing exits and releases the camera. Minimizing follows
+  the saved background setting; the preview can remain above other apps.
+- **Click:** index/thumb contact and release clicks; two cycles double-click.
+  An idle open palm arms clicks even when swipes are enabled.
+- **Wispr:** enable **Rock starts / swag stops Wispr** in Desktop. Raise index
+  and pinky, fold middle/ring and tuck the thumb to start. Relax or lower your
+  hand while talking. Extend index + pinky + thumb with that SAME hand to stop.
+  V and thumbs-up are inactive. Match the shortcut dropdown to Wispr's own
+  start/stop setting. Escape cancels.
+
 ### Turn window swipes off or on
 
 In **Hand touchpad → Touchpad: desktop**, uncheck **Enable window swipes**.
 You can do this while mouse controls are active: it cancels a pending swipe,
 keeps the mouse enabled and saves the choice for later launches. Recheck to
 enable swipes. For a manual override, put `"touchpad_swipe_enabled": false` in
-`config.local.json`. No open palm or deliberate wrist turn is required when
-swiping is enabled. Swipes are inactive in Gaming and Drawing. Disable controls
+`config.local.json`. Use an open RIGHT hand and sweep across your chest for next; reverse for
+previous. Mirroring is corrected automatically. Swipes are inactive in Gaming and Drawing. Disable controls
 before changing swipe sensitivity or cooldown.
 
 `config.json` contains portable defaults from the configuration class. Paper OCR

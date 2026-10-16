@@ -92,8 +92,10 @@ def probe():
         assert backend.api.IsIconic(order[1]), "Fixture did not minimize"
         cycle.switch(1);time.sleep(.15)
         report["minimized_window_restored"] = backend.foreground()==order[1] and not backend.api.IsIconic(order[1])
-        # Recorded hand observations -> real detector -> native activation.
-        clips=json.loads(ROOT.joinpath("tests/fixtures/natural_swipe_reference_landmarks.json").read_text())
+        # With --references, replay actual locally supplied hand observations.
+        # Otherwise use portable generic open-palm samples, without personal data.
+        fixture_name="right_hand_swipe_reference_landmarks.json" if "--references" in sys.argv else "open_palm_swipe_synthetic.json"
+        clips=json.loads(ROOT.joinpath("tests/fixtures",fixture_name).read_text())
         report["reference_swipe_results"]=[]
         class Mouse:
             def __init__(self):self.events=[];self.held=set()
@@ -114,8 +116,8 @@ def probe():
                 assert backend.foreground() in handles, "Focus left fixture"
                 hands=tuple(SimpleNamespace(landmarks=tuple(h["landmarks"]),ratio=h["ratio"],label=h["label"],handedness_confidence=h["confidence"]) for h in row["hands"])
                 session.process(hands,row["t"]+1,aspect=clip["aspect"])
-            expected=[1] if clip["video"].startswith("Next") else [-1]
-            report["reference_swipe_results"].append({"video":clip["video"],"mirrored":clip["mirrored"],"fixture_kind":clip["fixture_kind"],"events":switcher.events,"unwanted_mouse_events":mouse.events,"success":switcher.events==expected and not mouse.events and backend.foreground()!=before})
+            expected=[clip["expected_direction"]]
+            report["reference_swipe_results"].append({"name":clip.get("name",clip.get("video")),"mirrored":clip["mirrored"],"fixture_kind":clip["fixture_kind"],"events":switcher.events,"unwanted_mouse_events":mouse.events,"success":switcher.events==expected and not mouse.events and backend.foreground()!=before})
         report["reference_swipes_changed_native_focus_once_each"]=all(r["success"] for r in report["reference_swipe_results"])
         report["alt_released"] = not backend.alt_owned and not backend.api.GetAsyncKeyState(0x12)&0x8000
         report["success"] = all(report[k] for k in ("ordinary_permissions","unsuitable_windows_excluded","own_process_excluded","stable_forward_and_reverse_cycle","minimized_window_restored","reference_swipes_changed_native_focus_once_each","alt_released")) and report["eligible_fixture_windows"]==3

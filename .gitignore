@@ -24,3 +24,6 @@ evaluation-results.csv
 *.avi
 *.mkv
 *.webm
+
+# Original personal hand observations remain local.
+tests/fixtures/right_hand_swipe_reference_landmarks.json
