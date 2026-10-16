@@ -34,6 +34,10 @@ class Config:
     gaze_allow_unverified: bool = False
     touchpad_hand: str = "auto"
     touchpad_submode: str = "desktop"
+    fun_scene: str = "portal"
+    fun_portal_sound: bool = False
+    fun_web_sound: bool = False
+    fun_nebula_sound: bool = False
     touchpad_swipe_enabled: bool = True
     touchpad_swipe_sensitivity: float = 1.0
     touchpad_swipe_cooldown: float = .8
@@ -72,7 +76,9 @@ class Config:
         if self.ocr_device not in {"auto","cpu","cuda"}:raise ValueError("OCR device must be auto, cpu or cuda.")
         if type(self.gaze_allow_unverified) is not bool:raise ValueError("Unverified gaze choice must be true or false.")
         if self.touchpad_hand not in {"auto","Left","Right"}:raise ValueError("Invalid controlling hand.")
-        if self.touchpad_submode not in {"desktop","gaming","drawing"}:raise ValueError("Invalid touchpad sub-mode.")
+        if self.touchpad_submode not in {"desktop","gaming","drawing","fun"}:raise ValueError("Invalid touchpad sub-mode.")
+        if self.fun_scene not in {"portal","web","nebula"}:raise ValueError("Invalid playground scene.")
+        if any(type(v) is not bool for v in (self.fun_portal_sound,self.fun_web_sound,self.fun_nebula_sound)):raise ValueError("Playground sound choices must be true or false.")
         if type(self.touchpad_swipe_enabled) is not bool:raise ValueError("Window swipe option must be true or false.")
         if not (.5<=self.touchpad_swipe_sensitivity<=2 and .4<=self.touchpad_swipe_cooldown<=3):raise ValueError("Invalid window swipe sensitivity/cooldown.")
         if any(type(v) is not bool for v in (self.gaming_hud,self.drawing_two_hand)):raise ValueError("Gaming display and two-hand drawing options must be true or false.")

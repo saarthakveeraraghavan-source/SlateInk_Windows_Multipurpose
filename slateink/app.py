@@ -749,7 +749,9 @@ class MainWindow(CameraPreviewMixin,ModesMixin,QMainWindow):
                     primary=self.touchpad_session.primary
                     helper=self.touchpad_session.helper
                     keys=" + ".join(sorted(self.touchpad_session.gaming.wanted)) or "none"
-                    if self.config.touchpad_submode=="gaming":
+                    if self.config.touchpad_submode=="fun":
+                        self.hand_label.setText("Fun playground · "+(self.fun_window.model.input_state if self.fun_window else "Choose a scene, then Enter playground"))
+                    elif self.config.touchpad_submode=="gaming":
                         self.hand_label.setText(f"Mouse: right hand {'visible' if primary else 'missing'} · Joystick: left hand {'visible' if helper else 'missing'} · Button: {self.touchpad_session.button_held or 'none'} · WASD: {keys}")
                     else:self.hand_label.setText(f"Control: {primary.label if primary else 'missing'} · Helper: {helper.label if helper else 'none'} · Button: {self.touchpad_session.button_held or 'none'}")
                 elif self.mode=="eye_gaze":

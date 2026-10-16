@@ -108,6 +108,8 @@ class TouchpadSession:
         if not self.controller.enabled:return "Touchpad off."
         if self.last_submode!=self.config.touchpad_submode:
             self.interrupt();self.last_submode=self.config.touchpad_submode
+        if self.config.touchpad_submode=="fun":
+            self.interrupt();return "Fun playground owns hand gestures — desktop input is off."
         if self.dictating:
             return self.process_dictation(hands if age<=.2 else (),t,aspect)
         if age>.2:

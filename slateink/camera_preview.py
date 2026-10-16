@@ -98,7 +98,8 @@ class CameraPreviewMixin:
 
     def sync_camera_preview(self):
         preview=getattr(self,"camera_preview",None)
-        active=self.config.camera_preview_enabled and self.worker is not None and not self.worker.stop_event.is_set() and not self.closing
+        playground=getattr(self,"fun_window",None)
+        active=self.config.camera_preview_enabled and self.worker is not None and not self.worker.stop_event.is_set() and not self.closing and not (playground and playground.isVisible())
         if not active:
             if preview:preview.view.clear();preview.hide()
             return

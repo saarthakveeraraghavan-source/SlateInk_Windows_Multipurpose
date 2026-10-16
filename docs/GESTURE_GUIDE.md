@@ -179,6 +179,20 @@ Original recordings and extracted personal observations are excluded. See
 [swipe verification](WINDOW_SWIPE_VALIDATION.md) and
 [click/voice verification](CLICK_WISPR_VALIDATION.md).
 
+## Fun playground sub-mode
+
+Choose **Hand touchpad → Touchpad: fun playground → Enter playground** for
+**Portal fire**, **Web dome** and **Nebula**. Right-hand movement paints fire;
+a closed circle becomes a portal. Spread both hands to expand the 3D dome.
+In Nebula, your right hand attracts stars, your left repels and a right pinch
+bursts. No desktop clicks, swipes or Wispr gestures run in this playground.
+**1/2/3** switches scenes, **Space** clears, **P** pauses, **F11** toggles full
+screen and **Esc** returns and stops camera. See the [Fun guide](FUN_PLAYGROUND.md).
+Choose **Sound for this scene** before entering; each scene has its own saved
+toggle, initially off. Fire crackles and seals, the web resonates as it stretches,
+and Nebula has a space ambience and burst cascade. An in-scene sound button can
+mute/unmute the current scene.
+
 ## Gaming sub-mode
 
 Choose **Hand touchpad → Touchpad: gaming**, then Start camera and Enable gaming

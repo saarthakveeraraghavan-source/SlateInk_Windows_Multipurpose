@@ -129,6 +129,15 @@ Only one session runs per installation. Opening the shortcut again shows the
 existing window. Closing the main app waits for the isolated camera owner to
 exit, including bounded cleanup of a stalled driver read.
 
+For the new play space, disable desktop controls if active, then choose **Hand
+touchpad → Touchpad: fun playground → Enter playground**. Portal fire, Web dome
+and Nebula share the installed hand tracker; no extra install is required.
+Use **1/2/3** for scenes, **Space** to clear, **P** to pause, **F11** for full
+screen and **Esc** to leave and stop capture. See the [Fun guide](FUN_PLAYGROUND.md).
+Before entering, set **Sound for this scene**. The three scenes each save an
+independent sound choice; all begin off. Original synthesized effects use the
+existing audio output and installed packages. An in-scene button also mutes sound.
+
 ## 6. Preferences for this computer
 
 Camera index/exposure, speed and monitor reach can differ between computers.

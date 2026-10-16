@@ -16,11 +16,12 @@ from .touchpad_session import TouchpadSession
 from .desktop_shortcuts import WindowsWisprShortcut
 from .touchpad_submodes import WindowsMovementKeys
 from .window_switching import WindowsWindowSwitcher
+from .fun_mode import FunModeMixin
 
 MODES=("paper","hand_mouse","pen_pointer","finger_letters","eye_gaze")
 
 
-class ModesMixin:
+class ModesMixin(FunModeMixin):
     def initialize_modes(self):
         self.mode=self.config.initial_mode
         self.latest_rgb=None; self.latest_hand_count=0; self.latest_frame_at=None
@@ -32,7 +33,7 @@ class ModesMixin:
             self.mouse_sink=WindowsMouse(); self.hand_mouse=HandMouseController(self.config,self.mouse_sink)
         except InjectionError:pass
         self.shortcut_sink=None;self.touchpad_session=None;self.desktop_hotkey=None;self.tray=None;self.arm_touchpad_when_ready=False
-        self.game_hud=None
+        self.game_hud=None;self.fun_window=None
         if self.hand_mouse:
             self.shortcut_sink=WindowsWisprShortcut();self.touchpad_session=TouchpadSession(self.hand_mouse,self.shortcut_sink,WindowsMovementKeys(),WindowsWindowSwitcher())
         self.gaze_calibration=GazeCalibration();self.gaze_dialog=None
@@ -70,13 +71,22 @@ class ModesMixin:
         self.background_touchpad=QCheckBox("Keep running when minimized");self.background_touchpad.setChecked(self.config.touchpad_background);options.addWidget(self.background_touchpad)
         self.pause_button=self.button("Pause / resume · Ctrl+Alt+M",self.toggle_touchpad);options.addWidget(self.pause_button);options.addStretch();layout.addWidget(self.touchpad_panel)
         self.submode_panel=QWidget();sub=QHBoxLayout(self.submode_panel);sub.setContentsMargins(0,0,0,0)
-        self.submode_choice=QComboBox();self.submode_choice.addItems(["Touchpad: desktop","Touchpad: gaming","Touchpad: drawing tablet"])
-        self.submode_choice.setCurrentIndex(("desktop","gaming","drawing").index(self.config.touchpad_submode));sub.addWidget(self.submode_choice)
+        self.submode_choice=QComboBox();self.submode_choice.addItems(["Touchpad: desktop","Touchpad: gaming","Touchpad: drawing tablet","Touchpad: fun playground"])
+        self.submode_choice.setCurrentIndex(("desktop","gaming","drawing","fun").index(self.config.touchpad_submode));sub.addWidget(self.submode_choice)
         self.drawing_speed=QDoubleSpinBox();self.drawing_speed.setRange(.2,3);self.drawing_speed.setSingleStep(.1);self.drawing_speed.setValue(self.config.drawing_sensitivity);self.drawing_speed.setPrefix("Drawing speed × ");sub.addWidget(self.drawing_speed)
         self.gaming_radius=QDoubleSpinBox();self.gaming_radius.setRange(.12,.6);self.gaming_radius.setSingleStep(.02);self.gaming_radius.setValue(self.config.gaming_radius);self.gaming_radius.setPrefix("Joystick travel × palm ");sub.addWidget(self.gaming_radius)
         self.gaming_display=QCheckBox("Show WASD status over other apps");self.gaming_display.setChecked(self.config.gaming_hud);sub.addWidget(self.gaming_display)
         self.drawing_helper=QCheckBox("Left hand clicks / right hand draws");self.drawing_helper.setChecked(self.config.drawing_two_hand);sub.addWidget(self.drawing_helper)
         sub.addStretch();layout.addWidget(self.submode_panel)
+        self.fun_panel=QWidget();fun=QHBoxLayout(self.fun_panel);fun.setContentsMargins(0,0,0,0)
+        self.fun_scene_choice=QComboBox();self.fun_scene_choice.addItems(["Portal fire — draw in the air","Web dome — stretch with both hands","Nebula — gravity and star bursts"])
+        self.fun_scene_choice.setCurrentIndex(("portal","web","nebula").index(self.config.fun_scene));fun.addWidget(self.fun_scene_choice)
+        self.fun_sound=QCheckBox("Sound for this scene");self.fun_sound.setChecked(getattr(self.config,"fun_"+self.config.fun_scene+"_sound"));fun.addWidget(self.fun_sound)
+        self.fun_sound.setToolTip("Separate saved choice for Portal fire, Web dome and Nebula. Off by default. Turn on before entering, or mute inside the playground.")
+        self.fun_sound.toggled.connect(self.change_fun_sound)
+        self.fun_launch=self.button("Enter playground",self.launch_fun,"primary");fun.addWidget(self.fun_launch)
+        fun.addWidget(QLabel("Right hand creates · both hands expand · Esc returns"));fun.addStretch();layout.addWidget(self.fun_panel)
+        self.fun_scene_choice.currentIndexChanged.connect(self.change_fun_scene)
         self.swipe_panel=QWidget();swipes=QHBoxLayout(self.swipe_panel);swipes.setContentsMargins(0,0,0,0)
         self.swipe_enabled=QCheckBox("Enable window swipes");self.swipe_enabled.setChecked(self.config.touchpad_swipe_enabled);swipes.addWidget(self.swipe_enabled)
         self.swipe_enabled.setToolTip("Use your right hand: open the fingers and sweep as shown in your Next/Previous videos. Mirroring is corrected automatically. No fist hold or pointing-pose unlock. Uncheck anytime to disable; your choice is saved.")
@@ -116,19 +126,19 @@ class ModesMixin:
     def update_touchpad_options(self,*args):
         self.stop_pointer()
         self.config=replace(self.config,touchpad_hand=("auto","Left","Right")[self.hand_choice.currentIndex()],touchpad_scroll_speed=self.scroll_speed.value(),touchpad_natural_scroll=self.natural_scroll.isChecked(),touchpad_background=self.background_touchpad.isChecked(),wispr_enabled=self.wispr_enabled.isChecked(),wispr_shortcut_mode=("toggle_ctrl_win","hold_ctrl_win","toggle_ctrl_win_space")[self.wispr_mode.currentIndex()])
-        self.config=replace(self.config,touchpad_submode=("desktop","gaming","drawing")[self.submode_choice.currentIndex()],drawing_sensitivity=self.drawing_speed.value(),gaming_radius=self.gaming_radius.value(),gaming_hud=self.gaming_display.isChecked(),drawing_two_hand=self.drawing_helper.isChecked())
+        self.config=replace(self.config,touchpad_submode=("desktop","gaming","drawing","fun")[self.submode_choice.currentIndex()],drawing_sensitivity=self.drawing_speed.value(),gaming_radius=self.gaming_radius.value(),gaming_hud=self.gaming_display.isChecked(),drawing_two_hand=self.drawing_helper.isChecked())
         self.config=replace(self.config,touchpad_swipe_enabled=self.swipe_enabled.isChecked(),touchpad_swipe_sensitivity=self.swipe_sensitivity.value(),touchpad_swipe_cooldown=self.swipe_cooldown.value())
         if self.hand_mouse:self.hand_mouse.config=self.config
         if self.touchpad_session:self.touchpad_session.config=self.config
         self.set_state(State.READY if self.worker else State.CAMERA_OFF)
         if self.mode=="hand_mouse":
-            self.hint.setText({"desktop":"Start camera, then enable the mouse and open both pinches.","gaming":"Start camera, enable gaming controls and focus your game. Hold your left palm still to center; right hand controls the mouse. WASD feedback stays visible over the game.","drawing":"Start camera, enable drawing controls and focus your drawing app. Index + middle: hover. Thumb/index pinch: click. Index only with thumb away: draw."}[self.config.touchpad_submode])
+            self.hint.setText({"desktop":"Start camera, then enable the mouse and open both pinches.","gaming":"Start camera, enable gaming controls and focus your game. Hold your left palm still to center; right hand controls the mouse. WASD feedback stays visible over the game.","drawing":"Start camera, enable drawing controls and focus your drawing app. Index + middle: hover. Thumb/index pinch: click. Index only with thumb away: draw.","fun":"Choose a scene, then Enter playground. Camera starts for the playground; desktop controls stay off."}[self.config.touchpad_submode])
         self.save_touchpad_preferences()
 
     def save_touchpad_preferences(self):
         if not getattr(self,"persist_preferences",False):return
         from .config import save_preferences
-        keys=("touchpad_sensitivity","touchpad_hand","touchpad_submode","touchpad_swipe_enabled","touchpad_swipe_sensitivity","touchpad_swipe_cooldown","drawing_sensitivity","drawing_two_hand","gaming_radius","gaming_hud","touchpad_scroll_speed","touchpad_natural_scroll","touchpad_background","wispr_enabled","wispr_shortcut_mode")
+        keys=("touchpad_sensitivity","touchpad_hand","touchpad_submode","fun_scene","fun_portal_sound","fun_web_sound","fun_nebula_sound","touchpad_swipe_enabled","touchpad_swipe_sensitivity","touchpad_swipe_cooldown","drawing_sensitivity","drawing_two_hand","gaming_radius","gaming_hud","touchpad_scroll_speed","touchpad_natural_scroll","touchpad_background","wispr_enabled","wispr_shortcut_mode")
         try:save_preferences({key:getattr(self.config,key) for key in keys})
         except (OSError,ValueError):self.show_error("Could not save touchpad preferences. Current-session controls still use your choices.")
 
@@ -157,6 +167,10 @@ class ModesMixin:
 
     def toggle_touchpad(self):
         if self.state in {State.PROCESSING,State.TYPING}:return
+        if self.mode=="hand_mouse" and self.config.touchpad_submode=="fun":
+            if self.fun_window:self.fun_window.toggle_pause()
+            else:self.launch_fun()
+            return
         if self.mode=="hand_mouse" and self.hand_mouse and self.hand_mouse.enabled:
             try:self.hint.setText(self.touchpad_session.toggle_pause())
             except InjectionError as exc:self.stop_pointer();self.show_error(str(exc))
@@ -177,8 +191,9 @@ class ModesMixin:
         gaze=self.mode=="eye_gaze";gaze_active=bool(self.gaze_controller and self.gaze_controller.enabled)
         self.mode_choice.setEnabled(not busy and not stopping and self.recognition_worker is None and self.gaze_dialog is None)
         paper=self.mode=="paper"; hand=self.mode=="hand_mouse"; pen=self.mode=="pen_pointer"; finger=self.mode=="finger_letters"
-        drawing=hand and self.config.touchpad_submode=="drawing";gaming=hand and self.config.touchpad_submode=="gaming";desktop=hand and not drawing and not gaming
-        self.touchpad_panel.setVisible(hand);self.wispr_panel.setVisible(hand);self.submode_panel.setVisible(hand)
+        drawing=hand and self.config.touchpad_submode=="drawing";gaming=hand and self.config.touchpad_submode=="gaming";fun=hand and self.config.touchpad_submode=="fun";desktop=hand and self.config.touchpad_submode=="desktop"
+        self.touchpad_panel.setVisible(hand and not fun);self.wispr_panel.setVisible(hand and not fun);self.submode_panel.setVisible(hand)
+        self.fun_panel.setVisible(fun);self.fun_launch.setEnabled(not busy and not stopping)
         self.swipe_panel.setVisible(desktop)
         self.wispr_enabled.setVisible(desktop);self.wispr_mode.setVisible(desktop)
         self.drawing_speed.setVisible(drawing);self.gaming_radius.setVisible(gaming)
@@ -190,11 +205,12 @@ class ModesMixin:
         for option in (self.hand_choice,self.submode_choice,self.drawing_speed,self.drawing_helper,self.gaming_radius,self.gaming_display,self.scroll_speed,self.natural_scroll,self.background_touchpad,self.wispr_enabled,self.wispr_mode,self.swipe_sensitivity,self.swipe_cooldown):option.setEnabled(not mouse_active and self.pointer_deadline is None and not busy)
         self.dark_slate.setVisible(paper); self.ocr_variant.setVisible(paper)
         self.ocr_device.setVisible(paper);self.ocr_device.setEnabled(not busy and self.recognition_worker is None)
-        self.sensitivity.setVisible(hand and not drawing);self.sensitivity.setEnabled(not mouse_active and self.pointer_deadline is None)
+        self.sensitivity.setVisible(hand and not drawing and not fun);self.sensitivity.setEnabled(not mouse_active and self.pointer_deadline is None)
         self.dark_slate.setEnabled(not busy); self.ocr_variant.setEnabled(not busy)
-        self.right_click.setVisible((hand and not drawing) or gaze); self.right_click.setEnabled(not mouse_active and not gaze_active and self.pointer_deadline is None)
+        self.right_click.setVisible((hand and not drawing and not fun) or gaze); self.right_click.setEnabled(not mouse_active and not gaze_active and self.pointer_deadline is None)
         self.unverified_gaze.setVisible(gaze);self.unverified_gaze.setEnabled(not busy and not stopping and self.gaze_dialog is None)
-        self.pointer_button.setVisible(hand or pen or gaze)
+        self.pointer_button.setVisible((hand and not fun) or pen or gaze)
+        if fun:self.status_label.setText("FUN PLAYGROUND LIVE" if self.fun_window else "FUN PLAYGROUND READY")
         active=mouse_active or gaze_active or self.pen_pointer_enabled or self.pointer_deadline is not None
         if hand and mouse_active and self.touchpad_session:self.status_label.setText("HAND TOUCHPAD PAUSED" if self.touchpad_session.paused else ("WISPR LISTENING" if self.touchpad_session.dictating else "HAND TOUCHPAD ACTIVE"))
         if hand and mouse_active and not self.touchpad_session.paused and not desktop:self.status_label.setText("GAMING ACTIVE" if gaming else "DRAWING ACTIVE")
@@ -238,6 +254,7 @@ class ModesMixin:
         self.mode_note.setText(messages[self.mode])
         if gaming:self.mode_note.setText("Right hand: existing mouse gestures. Hold the left palm still briefly with at least three fingers extended to center; move forward W, left A, back S, right D. Center stops; fist stops/recenters. Ctrl+Alt+M pauses/resumes. The WASD status display stays visible over your game. Escape releases all input.")
         if drawing:self.mode_note.setText("Index + middle: hover and arm. Thumb + index pinch/release: click tools at the current cursor; keep middle extended. Index only with thumb away: draw without pinching. Raise middle to lift; fold fingers to reposition. Equal drawing scale in every direction. Escape stops capture.")
+        if fun:self.mode_note.setText("Portal fire: move your right hand to paint a fiery rope; draw a full circle to form a portal. Web dome: spread both hands to expand; move the right hand to rotate. Nebula: right hand attracts stars, left hand repels; right pinch bursts. F11 changes full screen, Space clears, P pauses, Esc exits and stops camera.")
         if drawing and self.config.drawing_two_hand:self.mode_note.setText("Right hand: index + middle hovers; index only draws. Left hand: thumb/index pinch clicks; keep another finger extended. Clicks lift ink and freeze the cursor, then right index + middle returns to hover. Drawing speed and smoothing use only the right fingertip. Escape stops capture.")
         self.ink_heading.setText({"paper":"Captured paper / slate writing","hand_mouse":"Touchpad status","pen_pointer":"Pen marker preview — no contact clicks","finger_letters":"Virtual ink / one letter at a time","eye_gaze":"Gaze preview — calibration required"}[self.mode])
         self.text_note.setText("Ink clears after Add letter; collected text stays." if finger else "Review captured text before sending; repeated captures replace the preview.")
@@ -246,9 +263,12 @@ class ModesMixin:
         self.ink_view.empty_message={"paper":"Captured writing appears here","hand_mouse":"Relative touchpad — no area calibration needed","pen_pointer":"Pen marker preview — automatic clicks disabled","finger_letters":"Write one letter here","eye_gaze":"Calibrate the nine-dot mapping, then enable desktop control"}[self.mode]
         if gaming:self.ink_view.empty_message="Left palm: forward W · left A · back S · right D\nRight hand: mouse · fist: stop/recenter"
         if drawing:self.ink_view.empty_message="Index only: ink · index + middle: hover\nThumb + index pinch: click a tool"
+        if fun:self.ink_view.empty_message="Choose Portal fire, Web dome or Nebula\nEnter playground to start"
         self.footer.setText("Local processing · calibration stays in memory · desktop controls start OFF · Escape stops capture and releases buttons" if hand or pen or gaze else "Local writing · preview before typing · no cloud or clipboard · Escape stops capture and pending typing")
+        if fun:self.footer.setText("Playground only · desktop actions stay off · Esc returns and stops the camera")
 
     def stop_pointer(self):
+        self.stop_fun()
         if self.game_hud:self.game_hud.hide()
         self.pointer_deadline=None; self.pen_pointer_enabled=False
         self.pen_filter.reset()
@@ -321,6 +341,7 @@ class ModesMixin:
         self.hint.setText("Controls are off. Join index + middle, then enable the touchpad; no area calibration is needed." if self.mode=="hand_mouse" else ("Face the webcam and calibrate the nine-dot mapping. Allow unverified gaze permits desktop control without passing the accuracy check." if self.mode=="eye_gaze" else "Mode changed. Controls are off; select/calibrate the area again. Collected text is kept."))
 
     def toggle_pointer(self):
+        if self.mode=="hand_mouse" and self.config.touchpad_submode=="fun":self.launch_fun();return
         if self.pointer_deadline is not None or self.pen_pointer_enabled or (self.hand_mouse is not None and self.hand_mouse.enabled) or (self.gaze_controller and self.gaze_controller.enabled):
             self.stop_pointer(); self.set_state(State.READY); return
         if not self.pointer_button.isEnabled():return
@@ -366,6 +387,8 @@ class ModesMixin:
 
     def process_mode_packet(self,packet,now):
         self.latest_rgb=packet.rgb; self.latest_frame_at=packet.t; self.latest_hand_count=packet.hand_count
+        if self.mode=="hand_mouse" and self.config.touchpad_submode=="fun":
+            self.process_fun_packet(packet,now);return
         if self.arm_touchpad_when_ready and self.mode=="hand_mouse" and now-packet.t<=.2:
             self.arm_touchpad_when_ready=False;self.refresh_controls();self.toggle_pointer()
         if self.mode=="hand_mouse" and self.hand_mouse.enabled:

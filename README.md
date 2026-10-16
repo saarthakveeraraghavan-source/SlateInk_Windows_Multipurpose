@@ -15,10 +15,36 @@ Physical accuracy and long-session reliability remain experimental.
 | Eye gaze + pinch | Experimental nine-target eye calibration and five-target accuracy check, followed by gaze pointing and pinch clicks |
 | Pen hover pointer | Experimental colored-marker tracking for pointer movement; pen contact does not infer a click |
 | Finger letters | Experimental one-letter-at-a-time virtual handwriting, local recognition, review and explicit acceptance |
+| Hand touchpad — Fun playground | Portal fire with right-hand trails and circle sealing; two-hand 3D web dome; a gravity-driven Nebula with pinch bursts |
 | Optional Wispr Flow shortcut | Rock sign (index + pinky, thumb tucked) starts; swag sign (index + pinky + thumb) with the same hand stops dictation through a matching installed Wispr shortcut; disabled by default |
 
 See the [gesture guide](docs/GESTURE_GUIDE.md) or its [HTML version](docs/GESTURE_GUIDE.html)
 for Desktop, Gaming, Drawing, background use, scrolling, shortcuts and pause/stop gestures.
+
+## Fun playground: Portal fire, Web dome and Nebula
+
+Disable desktop controls if active, then choose **Hand touchpad → Touchpad: fun
+playground → Enter playground**. It uses the installed hand tracker; there is no
+extra dependency, browser or account.
+
+- **Portal fire:** right-hand movement paints a fiery rope. Draw a closed circle
+  to form a glowing portal with rotating markings and sparks.
+- **Web dome:** spread both hands apart to expand a 3D wire dome; bring them
+  together to shrink it. Move the right hand to turn and tilt it.
+- **Nebula:** right hand attracts stars, left hand repels; open then pinch the
+  right thumb/index for a burst.
+
+The immersive window includes a camera hand check and a labelled **Try demo**
+mode. **1/2/3** changes scenes, **Space** clears, **P** pauses, **F11** switches
+fullscreen/windowed, and **Esc / Back** exits and stops the camera. Desktop
+clicks, WASD, swipes and Wispr stay off inside the playground. The last scene
+saves locally. See the [Fun guide](docs/FUN_PLAYGROUND.md).
+
+Before entry, choose **Sound for this scene**. Portal fire, Web dome and Nebula
+each remember a separate sound setting, initially off. Fire has crackles and a
+portal-seal effect, the web has stretch tones and ripple chimes, and Nebula has
+space ambience and burst cascades. You can mute inside the scene too. Sound
+stops on pause, focus loss and exit. No extra audio assets or packages are needed.
 
 ## Install and run on Windows
 
